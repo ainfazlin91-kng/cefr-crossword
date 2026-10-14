@@ -1,0 +1,3316 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CEFR LexiCross: Dynamic Crossword Quiz</title>
+    <meta name="description" content="An interactive, mobile-responsive CEFR English vocabulary crossword quiz game for primary school students with dynamic grid generation, certificate awards, and a teacher dashboard." />
+    <meta property="og:title" content="CEFR LexiCross: Dynamic Crossword Quiz" />
+    <meta property="og:description" content="An interactive, mobile-responsive CEFR English vocabulary crossword quiz game for primary school students with dynamic grid generation, certificate awards, and a teacher dashboard." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Firebase Compatibility SDK via CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <style>
+      :root {
+        --app-bg: #06400a;
+        --app-font-color: #c79700;
+        --card-bg: #09470e;
+        --card-inner-bg: #042e07;
+        --card-border: #c79700;
+        --text-gold: #c79700;
+        --text-light-gold: #fef08a;
+        --text-white: #ffffff;
+        --header-height: 64px;
+        --cell-size: 38px;
+        --primary-font: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        font-family: var(--primary-font);
+        background-color: var(--app-bg);
+        color: var(--app-font-color);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.5;
+        overflow-x: hidden;
+      }
+
+      h1, h2, h3, h4, h5, h6, p, span, label, input, select, button, a {
+        font-family: var(--primary-font);
+      }
+
+      /* Fixed Top Navigation Bar across Mobile, Tablet, and Desktop */
+      .app-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: var(--header-height);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        background: #09470e;
+        padding: 0 1.25rem;
+        border-bottom: 2.5px solid var(--card-border);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+
+      .app-header-inner {
+        width: 100%;
+        max-width: 1080px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .logo-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .logo-icon {
+        width: 44px;
+        height: 44px;
+        background: linear-gradient(135deg, #c79700, #a17800);
+        color: #06400a;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6rem;
+        font-weight: bold;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        border: 2px solid #fef08a;
+      }
+
+      .logo-title {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--text-gold);
+        letter-spacing: 0.02em;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      }
+
+      .logo-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-light-gold);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .app-container {
+        width: 100%;
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 1rem;
+        padding-top: calc(var(--header-height) + 1rem);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.65rem 1.2rem;
+        border-radius: 0.75rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+        text-decoration: none;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #c79700, #eab308);
+        color: #06400a;
+        border-color: #fef08a;
+        box-shadow: 0 4px 12px rgba(199, 151, 0, 0.35);
+      }
+
+      .btn-secondary {
+        background: var(--card-inner-bg);
+        color: var(--text-gold);
+        border: 2px solid var(--card-border);
+      }
+
+      .btn-secondary:hover {
+        background: #083d0c;
+        border-color: #fef08a;
+      }
+
+      .btn-accent {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #ffffff;
+        border-color: #fef08a;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      }
+
+      .btn-success {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: #ffffff;
+        border-color: #a7f3d0;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      }
+
+      .btn-outline-teacher {
+        background: var(--card-inner-bg);
+        border: 2px dashed var(--text-gold);
+        color: var(--text-gold);
+        font-size: 0.85rem;
+        padding: 0.5rem 0.9rem;
+      }
+
+      .btn-outline-teacher:hover {
+        background: #083d0c;
+        border-color: #fef08a;
+        color: #fef08a;
+      }
+
+      /* Screens Visibility */
+      .screen {
+        display: none;
+        animation: fadeIn 0.3s ease;
+      }
+
+      .screen.active {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Screen A: Registration */
+      .card {
+        background: var(--card-bg);
+        border-radius: 1.25rem;
+        padding: 2rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        border: 2px solid var(--card-border);
+      }
+
+      .registration-wrap {
+        max-width: 540px;
+        margin: auto;
+        width: 100%;
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: var(--card-inner-bg);
+        color: var(--text-gold);
+        padding: 0.35rem 0.85rem;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border: 1.5px solid var(--card-border);
+      }
+
+      .hero-title {
+        font-size: 2.1rem;
+        color: var(--text-gold);
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+      }
+
+      .hero-desc {
+        color: var(--text-light-gold);
+        font-size: 1rem;
+        margin-bottom: 1.75rem;
+      }
+
+      .form-group {
+        margin-bottom: 1.25rem;
+      }
+
+      .form-label {
+        display: block;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-gold);
+        margin-bottom: 0.4rem;
+      }
+
+      .form-label span.req {
+        color: #ef4444;
+      }
+
+      .form-input, .form-select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        font-size: 1.05rem;
+        border-radius: 0.75rem;
+        border: 2px solid var(--card-border);
+        background: var(--card-inner-bg);
+        color: #ffffff;
+        font-family: var(--primary-font);
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+
+      .form-input:focus, .form-select:focus {
+        border-color: #fef08a;
+        box-shadow: 0 0 0 3px rgba(199, 151, 0, 0.35);
+      }
+
+      .form-select option {
+        background: #042e07;
+        color: #ffffff;
+      }
+
+      .form-select optgroup {
+        background: #06400a;
+        color: var(--text-gold);
+        font-weight: bold;
+      }
+
+      .form-footer {
+        margin-top: 1.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .teacher-link-wrap {
+        text-align: center;
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+        border-top: 1px dashed rgba(199, 151, 0, 0.4);
+      }
+
+      .teacher-portal-link {
+        color: var(--text-gold);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: color 0.15s;
+        cursor: pointer;
+      }
+
+      .teacher-portal-link:hover {
+        color: #fef08a;
+        text-decoration: underline;
+      }
+
+      /* Screen Quiz: Interactive Game - Sticky Top Stats */
+      .quiz-top-info {
+        position: -webkit-sticky;
+        position: sticky;
+        top: calc(var(--header-height) + 6px);
+        z-index: 990;
+        width: 100%;
+        align-self: stretch;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        background: #09470e;
+        padding: 0.75rem 1.15rem;
+        border-radius: 1rem;
+        margin-bottom: 0.85rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.45);
+        border: 2px solid var(--card-border);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+
+      .student-pill {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--card-inner-bg);
+        padding: 0.35rem 0.85rem;
+        border-radius: 0.6rem;
+        border: 1.5px solid var(--card-border);
+        font-size: 0.95rem;
+      }
+
+      .badge-level {
+        background: var(--card-border);
+        color: #06400a;
+        padding: 0.15rem 0.5rem;
+        border-radius: 0.4rem;
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .stats-group {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+      }
+
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-gold);
+      }
+
+      .quiz-main-layout {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 1.25rem;
+        align-items: start;
+      }
+
+      @media (max-width: 900px) {
+        .quiz-main-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Crossword Grid Styles - Responsive & Scaled to Screen */
+      .grid-card {
+        background: var(--card-bg);
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        border: 2px solid var(--card-border);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .grid-scroll-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: visible;
+        padding: 0.2rem 0;
+      }
+
+      .crossword-grid {
+        display: grid;
+        gap: 2px;
+        background: #042e07;
+        padding: 4px;
+        border-radius: 10px;
+        border: 2px solid var(--card-border);
+        user-select: none;
+        width: min(100%, 460px);
+        aspect-ratio: 1 / 1;
+        box-sizing: border-box;
+      }
+
+      .grid-cell {
+        width: 100%;
+        height: 100%;
+        aspect-ratio: 1 / 1;
+        position: relative;
+        background: #fffdf0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.15s, border-color 0.15s;
+        border-radius: 3px;
+        box-sizing: border-box;
+      }
+
+      .grid-cell.black-cell {
+        background: #021a04;
+        background-image: radial-gradient(#083d0c 20%, transparent 22%);
+        background-size: 6px 6px;
+        border-radius: 3px;
+      }
+
+      .grid-cell .cell-number {
+        position: absolute;
+        top: 1.5px;
+        left: 2px;
+        font-size: clamp(6px, 1.8vw, 9px);
+        font-weight: 800;
+        color: #06400a;
+        line-height: 1;
+        pointer-events: none;
+      }
+
+      .grid-cell input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        text-align: center;
+        font-size: clamp(0.85rem, 3.2vw, 1.25rem);
+        font-family: var(--primary-font);
+        font-weight: 800;
+        background: transparent;
+        color: #06400a;
+        text-transform: uppercase;
+        cursor: pointer;
+        padding: 0;
+        margin: 0;
+        line-height: 1;
+        touch-action: manipulation;
+      }
+
+      .grid-cell.active-word {
+        background: #fef08a !important;
+      }
+
+      .grid-cell.active-cell {
+        background: #fde047 !important;
+        box-shadow: inset 0 0 0 3px #c79700 !important;
+      }
+
+      .grid-cell.cell-correct {
+        background: #bbf7d0 !important;
+        color: #06400a;
+      }
+
+      .grid-cell.cell-correct input {
+        color: #065f46;
+      }
+
+      .grid-cell.cell-incorrect {
+        background: #fecdd3 !important;
+        animation: shake 0.3s ease;
+      }
+
+      .grid-cell.cell-incorrect input {
+        color: #991b1b;
+      }
+
+      .grid-cell.cell-hinted {
+        background: #fef9c3 !important;
+      }
+
+      .grid-cell.cell-hinted::after {
+        content: "💡";
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        font-size: 8px;
+        pointer-events: none;
+      }
+
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-3px); }
+        75% { transform: translateX(3px); }
+      }
+
+      /* Active Clue Quick Banner Below Grid */
+      .active-clue-banner {
+        width: 100%;
+        max-width: 460px;
+        background: var(--card-inner-bg);
+        border: 1.5px solid var(--card-border);
+        border-radius: 0.65rem;
+        padding: 0.5rem 0.75rem;
+        margin-top: 0.65rem;
+        text-align: center;
+        font-size: 0.92rem;
+        color: var(--text-light-gold);
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1.35;
+      }
+
+      /* Tablet Specific Screen Adjustments (641px - 1024px) */
+      @media (min-width: 641px) and (max-width: 1024px) {
+        :root {
+          --header-height: 62px;
+        }
+
+        .app-header {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          width: 100% !important;
+          height: var(--header-height) !important;
+          z-index: 1000 !important;
+          padding: 0 1rem !important;
+          background: #09470e !important;
+          border-bottom: 2.5px solid var(--card-border) !important;
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+        }
+
+        .app-container {
+          padding: 0.75rem 0.85rem;
+          padding-top: calc(var(--header-height) + 0.85rem) !important;
+          width: 100%;
+        }
+
+        .logo-title {
+          font-size: 1.3rem;
+        }
+
+        .logo-icon {
+          width: 40px;
+          height: 40px;
+          font-size: 1.45rem;
+        }
+
+        .quiz-top-info {
+          position: -webkit-sticky !important;
+          position: sticky !important;
+          top: calc(var(--header-height) + 6px) !important;
+          z-index: 990 !important;
+          width: 100% !important;
+          background: #09470e !important;
+          padding: 0.6rem 0.85rem !important;
+          border-radius: 0.85rem !important;
+          margin-bottom: 0.75rem !important;
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+        }
+
+        .grid-card {
+          padding: 1rem 0.75rem;
+        }
+
+        .crossword-grid {
+          width: min(100%, 450px);
+        }
+      }
+
+      /* Mobile Specific Screen Adjustments (max-width: 640px) */
+      @media (max-width: 640px) {
+        :root {
+          --header-height: 56px;
+        }
+
+        .app-header {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          width: 100% !important;
+          height: var(--header-height) !important;
+          z-index: 1000 !important;
+          padding: 0 0.75rem !important;
+          background: #09470e !important;
+          border-bottom: 2px solid var(--card-border) !important;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        .app-container {
+          padding: 0.4rem;
+          padding-top: calc(var(--header-height) + 0.5rem) !important;
+          overflow: visible;
+        }
+
+        .logo-title {
+          font-size: 1.12rem;
+        }
+
+        .logo-subtitle {
+          font-size: 0.65rem;
+        }
+
+        .logo-icon {
+          width: 34px;
+          height: 34px;
+          font-size: 1.25rem;
+        }
+
+        .quiz-top-info {
+          position: -webkit-sticky !important;
+          position: sticky !important;
+          top: calc(var(--header-height) + 4px) !important;
+          z-index: 990 !important;
+          width: 100% !important;
+          background: #09470e !important;
+          padding: 0.45rem 0.65rem;
+          border-radius: 0.75rem;
+          margin-bottom: 0.5rem;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+        }
+
+        .stats-group {
+          gap: 0.65rem;
+        }
+
+        .stat-item {
+          font-size: 0.88rem;
+        }
+
+        .student-pill {
+          font-size: 0.88rem;
+        }
+
+        .grid-card {
+          padding: 0.5rem 0.25rem;
+          border-radius: 0.85rem;
+        }
+
+        .crossword-grid {
+          width: 100%;
+          max-width: calc(100vw - 16px);
+          gap: 1px;
+          padding: 2px;
+          border-radius: 6px;
+        }
+
+        .grid-cell {
+          border-radius: 2px;
+        }
+
+        .grid-cell .cell-number {
+          top: 0.5px;
+          left: 1px;
+          font-size: 7px;
+        }
+
+        .grid-cell input {
+          font-size: 0.95rem;
+        }
+
+        .active-clue-banner {
+          font-size: 0.85rem;
+          padding: 0.4rem 0.5rem;
+          margin-top: 0.5rem;
+        }
+
+        .grid-actions {
+          margin-top: 0.75rem;
+          gap: 0.4rem;
+        }
+
+        .grid-actions .btn {
+          padding: 0.5rem 0.75rem;
+          font-size: 0.85rem;
+        }
+      }
+
+      /* Quiz Controls Bar */
+      .grid-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        justify-content: center;
+        margin-top: 1.25rem;
+        width: 100%;
+      }
+
+      .keyboard-hints-guide {
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
+        color: var(--text-light-gold);
+        text-align: center;
+      }
+
+      /* Clues Panel */
+      .clues-card {
+        background: var(--card-bg);
+        border-radius: 1.25rem;
+        border: 2px solid var(--card-border);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        padding: 1.25rem;
+        max-height: 580px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .clues-header {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-gold);
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .clue-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .clue-tab-btn {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        background: var(--card-inner-bg);
+        border: 1.5px solid var(--card-border);
+        border-radius: 0.6rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-gold);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .clue-tab-btn.active {
+        background: var(--card-border);
+        color: #06400a;
+      }
+
+      .clues-list {
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        padding-right: 0.25rem;
+        flex: 1;
+      }
+
+      .clues-list::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .clues-list::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+      }
+
+      .clues-list::-webkit-scrollbar-thumb {
+        background: var(--card-border);
+        border-radius: 10px;
+      }
+
+      .clue-item {
+        background: var(--card-inner-bg);
+        padding: 0.65rem 0.85rem;
+        border-radius: 0.65rem;
+        border: 1.5px solid rgba(199, 151, 0, 0.3);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .clue-item:hover {
+        border-color: var(--text-light-gold);
+        background: #083d0c;
+      }
+
+      .clue-item.active-clue {
+        border-color: #fde047;
+        background: #0a4f10;
+        box-shadow: 0 0 0 2px rgba(253, 224, 71, 0.4);
+      }
+
+      .clue-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .clue-num {
+        font-weight: 800;
+        color: var(--text-gold);
+        font-size: 0.95rem;
+      }
+
+      .clue-tag {
+        font-size: 0.7rem;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        text-transform: uppercase;
+        font-weight: 800;
+      }
+
+      .tag-def { background: #0284c7; color: #ffffff; }
+      .tag-blank { background: #7c3aed; color: #ffffff; }
+
+      .clue-len {
+        font-size: 0.8rem;
+        color: var(--text-light-gold);
+      }
+
+      .clue-text {
+        font-size: 0.92rem;
+        color: #ffffff;
+        line-height: 1.4;
+      }
+
+      /* Screen B: Results & Certificate */
+      .results-screen-wrap {
+        max-width: 880px;
+        margin: auto;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .results-summary-card {
+        background: var(--card-bg);
+        border-radius: 1.25rem;
+        padding: 1.75rem;
+        border: 2px solid var(--card-border);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+        text-align: center;
+      }
+
+      .celebration-emoji {
+        font-size: 3.2rem;
+        margin-bottom: 0.5rem;
+        animation: bounce 1.5s infinite;
+      }
+
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+
+      .results-title {
+        font-size: 1.85rem;
+        color: var(--text-gold);
+        margin-bottom: 0.35rem;
+      }
+
+      .score-metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .metric-box {
+        background: var(--card-inner-bg);
+        padding: 1rem;
+        border-radius: 0.85rem;
+        border: 1.5px solid var(--card-border);
+      }
+
+      .metric-val {
+        font-size: 1.85rem;
+        font-weight: 800;
+        color: var(--text-gold);
+        line-height: 1.2;
+      }
+
+      .metric-lbl {
+        font-size: 0.82rem;
+        color: var(--text-light-gold);
+        text-transform: uppercase;
+        margin-top: 0.25rem;
+        font-weight: 700;
+      }
+
+      .cloud-sync-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.88rem;
+        color: #86efac;
+        background: #042e07;
+        padding: 0.35rem 0.75rem;
+        border-radius: 9999px;
+        border: 1px solid #166534;
+      }
+
+      /* Clean Certificate Card */
+      .certificate-wrapper {
+        background: #fffdf0;
+        color: #06400a;
+        border-radius: 1.5rem;
+        padding: 3rem 2.5rem;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        border: 8px solid #06400a;
+        outline: 4px dashed #c79700;
+        outline-offset: -12px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .certificate-wrapper::after {
+        content: '';
+        position: absolute;
+        inset: 15px;
+        border: 1.5px solid #c79700;
+        pointer-events: none;
+      }
+
+      .cert-header {
+        margin-bottom: 1.25rem;
+      }
+
+      .cert-org {
+        font-size: 1rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #06400a;
+        font-weight: 800;
+      }
+
+      .cert-title {
+        font-size: 2.4rem;
+        font-weight: 800;
+        color: var(--text-gold);
+        letter-spacing: 0.02em;
+        margin: 0.25rem 0;
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.1);
+      }
+
+      .cert-subtitle {
+        font-size: 1.05rem;
+        color: #06400a;
+        font-style: italic;
+      }
+
+      .cert-body {
+        margin: 1.5rem 0;
+      }
+
+      .cert-student-name {
+        font-size: 2.6rem;
+        font-weight: 800;
+        color: var(--text-gold);
+        border-bottom: 3px solid #c79700;
+        display: inline-block;
+        padding: 0 2rem 0.25rem 2rem;
+        margin: 0.5rem 0;
+      }
+
+      .cert-text {
+        font-size: 1.1rem;
+        color: #06400a;
+        max-width: 620px;
+        margin: 0.75rem auto;
+        line-height: 1.6;
+      }
+
+      .cert-text strong {
+        color: #c79700;
+      }
+
+      .cert-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-top: 2.5rem;
+        padding: 0 1.5rem;
+      }
+
+      .cert-seal {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fef08a 0%, #c79700 80%, #a17800 100%);
+        color: #06400a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+        border: 3px solid #06400a;
+        outline: 2px dashed #ffffff;
+        transform: rotate(-8deg);
+      }
+
+      .cert-seal-star {
+        font-size: 1.2rem;
+        line-height: 1;
+      }
+
+      .cert-seal-text {
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        text-align: center;
+        line-height: 1.1;
+      }
+
+      .cert-sig-block {
+        text-align: center;
+      }
+
+      .cert-sig-line {
+        width: 180px;
+        border-bottom: 2.5px solid #06400a;
+        margin-bottom: 0.35rem;
+        font-style: italic;
+        font-weight: 800;
+        font-size: 1.35rem;
+        color: #06400a;
+      }
+
+      .cert-sig-title {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: #c79700;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+      }
+
+      /* Screen C: Teacher Dashboard */
+      .dashboard-card {
+        background: var(--card-bg);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        border: 2px solid var(--card-border);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      }
+
+      .dashboard-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(199, 151, 0, 0.3);
+      }
+
+      .filters-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+        align-items: center;
+      }
+
+      .filter-input {
+        flex: 1;
+        min-width: 180px;
+        padding: 0.55rem 0.85rem;
+        border-radius: 0.65rem;
+        border: 1.5px solid var(--card-border);
+        background: var(--card-inner-bg);
+        color: #ffffff;
+        font-size: 0.95rem;
+      }
+
+      .table-wrapper {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 480px;
+        border-radius: 0.75rem;
+        border: 2px solid var(--card-border);
+        position: relative;
+        background: var(--card-inner-bg);
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+      }
+
+      .table-wrapper::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      .table-wrapper::-webkit-scrollbar-track {
+        background: #021a04;
+      }
+
+      .table-wrapper::-webkit-scrollbar-thumb {
+        background: var(--card-border);
+        border-radius: 4px;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.95rem;
+        text-align: left;
+      }
+
+      .data-table thead {
+        position: sticky;
+        top: 0;
+        z-index: 25;
+      }
+
+      .data-table th {
+        position: sticky;
+        top: 0;
+        z-index: 25;
+        background: #042e07;
+        color: var(--text-gold);
+        font-weight: 800;
+        padding: 0.85rem 1rem;
+        border-bottom: 2.5px solid var(--card-border);
+        white-space: nowrap;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+      }
+
+      .data-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(199, 151, 0, 0.2);
+        color: #ffffff;
+      }
+
+      .data-table tr:hover {
+        background: rgba(199, 151, 0, 0.1);
+      }
+
+      .badge-score {
+        padding: 0.25rem 0.65rem;
+        border-radius: 9999px;
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .score-high { background: #bbf7d0; color: #06400a; }
+      .score-med { background: #fef08a; color: #854d0e; }
+      .score-low { background: #fecdd3; color: #991b1b; }
+
+      /* Modal */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(4, 30, 6, 0.8);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+      }
+
+      .modal-backdrop.open {
+        display: flex;
+      }
+
+      .modal-box {
+        background: var(--card-bg);
+        border-radius: 1.25rem;
+        width: 100%;
+        max-width: 440px;
+        padding: 1.75rem;
+        box-shadow: 0 20px 25px rgba(0,0,0,0.5);
+        border: 2px solid var(--card-border);
+      }
+
+      .modal-title {
+        font-size: 1.4rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-gold);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top Navigation / Brand Header - Fixed at Top across Mobile, Tablet & Desktop -->
+    <header class="app-header">
+      <div class="app-header-inner">
+        <div class="logo-group">
+          <div class="logo-icon">🧩</div>
+          <div>
+            <div class="logo-title">CEFR LexiCross</div>
+            <div class="logo-subtitle">Dynamic Crossword Quiz</div>
+          </div>
+        </div>
+
+        <div class="header-controls">
+          <button id="nav-teacher-btn" class="btn btn-outline-teacher" title="Teacher Assessment Portal">
+            👩‍🏫 Teacher Portal
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="app-container">
+
+      <!-- ============================================== -->
+      <!-- SCREEN A: REGISTRATION & DIFFICULTY SELECTION -->
+      <!-- ============================================== -->
+      <main id="screen-register" class="screen active">
+        <div class="registration-wrap">
+          <div class="card">
+            <div class="hero-badge">Primary English CEFR</div>
+            <h1 class="hero-title">Crossword Quest!</h1>
+            <p class="hero-desc">Fill in words, beat the clock, and earn your official CEFR Achievement Certificate.</p>
+
+            <form id="form-registration" onsubmit="event.preventDefault(); startQuiz();">
+              <!-- Student Name -->
+              <div class="form-group">
+                <label class="form-label" for="input-name">Student Full Name <span class="req">*</span></label>
+                <input 
+                  type="text" 
+                  id="input-name" 
+                  class="form-input" 
+                  placeholder="e.g. Nur Aina Zahra" 
+                  required 
+                  autocomplete="name"
+                />
+              </div>
+
+              <!-- Stream Class Selection (18 Streams) -->
+              <div class="form-group">
+                <label class="form-label" for="select-class">Primary Class Stream <span class="req">*</span></label>
+                <select id="select-class" class="form-select" required>
+                  <option value="" disabled selected>-- Select Your Class --</option>
+                  
+                  <optgroup label="Year 1">
+                    <option value="1 Intelligent">1 Intelligent</option>
+                    <option value="1 Excellent">1 Excellent</option>
+                    <option value="1 Brilliant">1 Brilliant</option>
+                  </optgroup>
+
+                  <optgroup label="Year 2">
+                    <option value="2 Intelligent">2 Intelligent</option>
+                    <option value="2 Excellent">2 Excellent</option>
+                    <option value="2 Brilliant">2 Brilliant</option>
+                  </optgroup>
+
+                  <optgroup label="Year 3">
+                    <option value="3 Intelligent">3 Intelligent</option>
+                    <option value="3 Excellent">3 Excellent</option>
+                    <option value="3 Brilliant">3 Brilliant</option>
+                  </optgroup>
+
+                  <optgroup label="Year 4">
+                    <option value="4 Intelligent">4 Intelligent</option>
+                    <option value="4 Excellent">4 Excellent</option>
+                    <option value="4 Brilliant">4 Brilliant</option>
+                  </optgroup>
+
+                  <optgroup label="Year 5">
+                    <option value="5 Intelligent">5 Intelligent</option>
+                    <option value="5 Excellent">5 Excellent</option>
+                    <option value="5 Brilliant">5 Brilliant</option>
+                  </optgroup>
+
+                  <optgroup label="Year 6">
+                    <option value="6 Intelligent">6 Intelligent</option>
+                    <option value="6 Excellent">6 Excellent</option>
+                    <option value="6 Brilliant">6 Brilliant</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <!-- Difficulty Level -->
+              <div class="form-group">
+                <label class="form-label" for="select-level">Difficulty Level <span class="req">*</span></label>
+                <select id="select-level" class="form-select" required>
+                  <option value="easy">Easy (3-5 Letter Words | Pre-A1)</option>
+                  <option value="medium" selected>Medium (5-7 Letter Words | A1)</option>
+                  <option value="hard">Hard (7+ Letter Words | A2)</option>
+                </select>
+              </div>
+
+              <!-- Submit -->
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary" style="font-size: 1.15rem; padding: 0.85rem;">
+                  🚀 Generate Crossword
+                </button>
+              </div>
+
+              <!-- Teacher Portal Bottom Link -->
+              <div class="teacher-link-wrap">
+                <a href="javascript:void(0)" id="link-teacher-login" class="teacher-portal-link">
+                  🔒 Teacher Portal Login
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </main>
+
+      <!-- ============================================== -->
+      <!-- SCREEN QUIZ: INTERACTIVE CROSSWORD PUZZLE       -->
+      <!-- ============================================== -->
+      <main id="screen-quiz" class="screen">
+        <!-- Top Stats Banner -->
+        <div class="quiz-top-info">
+          <div class="student-pill">
+            <span style="font-weight: 800; color:var(--text-gold);" id="quiz-student-display">Student</span>
+            <span class="badge-level" id="quiz-class-display">Class</span>
+            <span class="badge-level" id="quiz-level-display" style="background:#a17800; color:#fffdf0;">Level</span>
+          </div>
+
+          <div class="stats-group">
+            <div class="stat-item" title="Elapsed Time">
+              <span class="icon">⏱️</span>
+              <span id="quiz-timer">00:00</span>
+            </div>
+            <div class="stat-item" title="Hints Used">
+              <span class="icon">💡</span>
+              <span id="quiz-hints-count">0 hints</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Layout: Grid + Clues -->
+        <div class="quiz-main-layout">
+          <!-- Crossword Grid View -->
+          <div class="grid-card">
+            <div class="grid-scroll-wrapper">
+              <div id="crossword-container" class="crossword-grid"></div>
+            </div>
+
+            <!-- Active Clue Indicator for Mobile & Desktop -->
+            <div id="active-clue-banner" class="active-clue-banner">
+              Tap any crossword cell to view clue!
+            </div>
+
+            <!-- Quiz Action Buttons -->
+            <div class="grid-actions">
+              <button id="btn-check" class="btn btn-secondary" onclick="checkAnswers()">
+                🔍 Check Answers
+              </button>
+              <button id="btn-hint" class="btn btn-accent" onclick="provideHint()">
+                💡 Hint (Reveal Letter)
+              </button>
+              <button id="btn-submit" class="btn btn-primary" onclick="confirmSubmitCrossword()">
+                ✅ Submit Crossword
+              </button>
+            </div>
+
+            <div class="keyboard-hints-guide">
+              💡 Tip: Click any cell to switch between Across & Down. Type letters directly or use arrow keys!
+            </div>
+          </div>
+
+          <!-- Clues Panel -->
+          <div class="clues-card">
+            <div class="clues-header">
+              <span>Crossword Clues</span>
+              <span id="clues-total-badge" style="font-size:0.85rem; color:var(--text-light-gold);">0 clues</span>
+            </div>
+
+            <div class="clue-tabs">
+              <button id="tab-btn-across" class="clue-tab-btn active" onclick="switchClueTab('across')">
+                Across (<span id="count-across">0</span>)
+              </button>
+              <button id="tab-btn-down" class="clue-tab-btn" onclick="switchClueTab('down')">
+                Down (<span id="count-down">0</span>)
+              </button>
+            </div>
+
+            <div id="clues-list" class="clues-list"></div>
+          </div>
+        </div>
+      </main>
+
+      <!-- ============================================== -->
+      <!-- SCREEN B: RESULTS & CERTIFICATE                -->
+      <!-- ============================================== -->
+      <main id="screen-results" class="screen">
+        <div class="results-screen-wrap">
+          <!-- Summary card -->
+          <div class="results-summary-card">
+            <div class="celebration-emoji">🏆</div>
+            <h2 class="results-title">Brilliant Job, Crossword Champion!</h2>
+            <p style="color:var(--text-light-gold); font-size:1.05rem;">You successfully solved the CEFR LexiCross challenge.</p>
+
+            <div class="score-metrics-grid">
+              <div class="metric-box">
+                <div class="metric-val" id="res-score">100%</div>
+                <div class="metric-lbl">Final Score</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-val" id="res-time">02:14</div>
+                <div class="metric-lbl">Time Taken</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-val" id="res-hints">1</div>
+                <div class="metric-lbl">Hints Used</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-val" id="res-stars">⭐⭐⭐</div>
+                <div class="metric-lbl">Award Rank</div>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1.25rem;">
+              <span id="db-status-badge" class="cloud-sync-status">
+                ☁️ Saving result to Class Leaderboard...
+              </span>
+            </div>
+
+            <!-- Save Action Buttons -->
+            <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="downloadCertificateImage()" title="Save high-resolution Certificate as PNG image file">
+                💾 Save Certificate (PNG Image)
+              </button>
+              <button class="btn btn-accent" onclick="restartGame()">
+                🔄 Play Another Level
+              </button>
+              <button class="btn btn-outline-teacher" onclick="openTeacherPortalFromResults()">
+                📊 View Teacher Dashboard
+              </button>
+            </div>
+          </div>
+
+          <!-- Certificate Component -->
+          <div id="printable-certificate" class="certificate-wrapper">
+            <div class="cert-header">
+              <div class="cert-org">Ministry of Education • CEFR English Programme</div>
+              <h1 class="cert-title">Certificate of Achievement</h1>
+              <div class="cert-subtitle">This official certificate is proudly presented to:</div>
+            </div>
+
+            <div class="cert-body">
+              <div class="cert-student-name" id="cert-name">Student Name</div>
+              
+              <p class="cert-text">
+                from Class <strong id="cert-class">1 Intelligent</strong>, in recognition of outstanding vocabulary proficiency and problem-solving skills in the 
+                <strong>CEFR LexiCross English Quiz</strong> at <strong id="cert-level">Medium (A1)</strong> level.
+              </p>
+            </div>
+
+            <div class="cert-footer">
+              <div class="cert-seal">
+                <div class="cert-seal-star">★</div>
+                <div class="cert-seal-text">CEFR<br>EXCELLENCE</div>
+              </div>
+
+              <div class="cert-sig-block">
+                <div class="cert-sig-line">Anne Teacher</div>
+                <div class="cert-sig-title">Teacher Anne<br>CEFR English Coordinator</div>
+              </div>
+
+              <div class="cert-sig-block">
+                <div class="cert-sig-line" id="cert-date" style="font-size:1.05rem; font-style:normal;">14 Oct 2026</div>
+                <div class="cert-sig-title">Date of Completion</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- ============================================== -->
+      <!-- SCREEN C: TEACHER DASHBOARD (PASSWORD GATE)    -->
+      <!-- ============================================== -->
+      <main id="screen-dashboard" class="screen">
+        <div class="dashboard-card">
+          <div class="dashboard-header">
+            <div>
+              <h2 style="font-size: 1.65rem; color: var(--text-gold);">Teacher Assessment Dashboard</h2>
+              <p style="color:var(--text-light-gold); font-size: 0.95rem;">Real-time student submissions & CEFR performance analytics</p>
+            </div>
+            <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="exportToCSV()">
+                📥 Export to CSV
+              </button>
+              <button class="btn btn-secondary" onclick="loadFirebaseScores()">
+                🔄 Refresh
+              </button>
+              <button class="btn btn-accent" onclick="exitTeacherDashboard()">
+                ⬅️ Back to Quiz
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary Metric Cards -->
+          <div class="score-metrics-grid" style="margin-bottom: 1.25rem;">
+            <div class="metric-box">
+              <div class="metric-val" id="dash-total-submissions">0</div>
+              <div class="metric-lbl">Total Attempts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val" id="dash-avg-score">0%</div>
+              <div class="metric-lbl">Average Score</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val" id="dash-avg-hints">0</div>
+              <div class="metric-lbl">Average Hints</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val" id="dash-top-class">-</div>
+              <div class="metric-lbl">Most Active Class</div>
+            </div>
+          </div>
+
+          <!-- Filters Row -->
+          <div class="filters-row">
+            <input 
+              type="text" 
+              id="dash-filter-name" 
+              class="filter-input" 
+              placeholder="🔍 Search student name..." 
+              oninput="applyDashboardFilters()"
+            />
+
+            <!-- Filter by 18 Primary Stream Classes -->
+            <select id="dash-filter-class" class="filter-input" onchange="applyDashboardFilters()">
+              <option value="">All Stream Classes (18)</option>
+              <optgroup label="Year 1">
+                <option value="1 Intelligent">1 Intelligent</option>
+                <option value="1 Excellent">1 Excellent</option>
+                <option value="1 Brilliant">1 Brilliant</option>
+              </optgroup>
+              <optgroup label="Year 2">
+                <option value="2 Intelligent">2 Intelligent</option>
+                <option value="2 Excellent">2 Excellent</option>
+                <option value="2 Brilliant">2 Brilliant</option>
+              </optgroup>
+              <optgroup label="Year 3">
+                <option value="3 Intelligent">3 Intelligent</option>
+                <option value="3 Excellent">3 Excellent</option>
+                <option value="3 Brilliant">3 Brilliant</option>
+              </optgroup>
+              <optgroup label="Year 4">
+                <option value="4 Intelligent">4 Intelligent</option>
+                <option value="4 Excellent">4 Excellent</option>
+                <option value="4 Brilliant">4 Brilliant</option>
+              </optgroup>
+              <optgroup label="Year 5">
+                <option value="5 Intelligent">5 Intelligent</option>
+                <option value="5 Excellent">5 Excellent</option>
+                <option value="5 Brilliant">5 Brilliant</option>
+              </optgroup>
+              <optgroup label="Year 6">
+                <option value="6 Intelligent">6 Intelligent</option>
+                <option value="6 Excellent">6 Excellent</option>
+                <option value="6 Brilliant">6 Brilliant</option>
+              </optgroup>
+            </select>
+
+            <!-- Filter by Difficulty -->
+            <select id="dash-filter-level" class="filter-input" onchange="applyDashboardFilters()">
+              <option value="">All Difficulty Levels</option>
+              <option value="easy">Easy (Pre-A1)</option>
+              <option value="medium">Medium (A1)</option>
+              <option value="hard">Hard (A2)</option>
+            </select>
+          </div>
+
+          <!-- Data Table -->
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Student Name</th>
+                  <th>Class Stream</th>
+                  <th>Level</th>
+                  <th>Score</th>
+                  <th>Hints</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody id="dash-table-body">
+                <tr>
+                  <td colspan="7" style="text-align:center; padding: 2rem; color:var(--text-light-gold);">
+                    Loading student submission records...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TEACHER LOGIN MODAL                             -->
+    <!-- ============================================== -->
+    <div id="modal-teacher-login" class="modal-backdrop">
+      <div class="modal-box">
+        <h3 class="modal-title">Teacher Portal Authentication</h3>
+        <p style="color:var(--text-light-gold); font-size:0.95rem; margin-bottom: 1.25rem;">
+          Enter the teacher access password to access live assessment reports.
+        </p>
+
+        <form id="form-teacher-auth" onsubmit="event.preventDefault(); verifyTeacherPassword();">
+          <div class="form-group">
+            <label class="form-label" for="input-teacher-pwd">Password</label>
+            <input 
+              type="password" 
+              id="input-teacher-pwd" 
+              class="form-input" 
+              placeholder="Enter teacher password" 
+              required
+            />
+            <div id="teacher-pwd-err" style="color:#ef4444; font-size:0.85rem; margin-top:0.35rem; display:none; font-weight:bold;">
+              Incorrect password. Please try again.
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.6rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="closeTeacherModal()">
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary">
+              Unlock Dashboard
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- JAVASCRIPT APPLICATION LOGIC                    -->
+    <!-- ============================================== -->
+    <script>
+      // 1. FIREBASE INITIALIZATION WITH PROVIDED CONFIG
+      const firebaseConfig = {
+        apiKey: "AIzaSyAR5GdrmL5XfVt_uWxX2J1tCwCtUF8pYNk",
+        authDomain: "aladdin-english-game.firebaseapp.com",
+        databaseURL: "https://aladdin-english-game-default-rtdb.firebaseio.com",
+        projectId: "aladdin-english-game",
+        storageBucket: "aladdin-english-game.firebasestorage.app",
+        messagingSenderId: "299335316128",
+        appId: "1:299335316128:web:c1e8e96eab366a4a57cfc5",
+        measurementId: "G-SYP3WQXGP5"
+      };
+
+      let database = null;
+      try {
+        if (typeof firebase !== 'undefined') {
+          firebase.initializeApp(firebaseConfig);
+          database = firebase.database();
+          console.log("Firebase initialized successfully");
+        }
+      } catch (err) {
+        console.warn("Firebase initialization warning (using local store fallback):", err);
+      }
+
+      // 2. MASSIVE CEFR VOCABULARY DATASETS (125-135+ WORDS PER DIFFICULTY)
+      // Designed so students can play dozens of times without repeating words!
+      const VOCAB_POOLS = {
+        easy: [
+          { word: "BOOK", type: "definition", text: "Sheets of paper bound together with stories or lessons to read." },
+          { word: "FROG", type: "fill_blank", text: "The little green ___ hopped into the cool water pond." },
+          { word: "APPLE", type: "definition", text: "A sweet, round red or green fruit that grows on an orchard tree." },
+          { word: "DANCE", type: "fill_blank", text: "The joyful students love to ___ when happy music plays." },
+          { word: "HAPPY", type: "definition", text: "Feeling or expressing pleasure, satisfaction, and joy; not sad." },
+          { word: "BIRD", type: "fill_blank", text: "A singing yellow ___ built a soft nest high in the leafy branch." },
+          { word: "MILK", type: "definition", text: "A nourishing white liquid drink rich in calcium from cows." },
+          { word: "CAT", type: "fill_blank", text: "The playful fluffy ___ purred gently as it sat on the warm rug." },
+          { word: "SUN", type: "definition", text: "The radiant star at the center of our solar system providing daylight." },
+          { word: "TREE", type: "fill_blank", text: "Green apples grow high on the branches of the wooden ___." },
+          { word: "FISH", type: "definition", text: "A cold-blooded creature with fins and gills that swims in water." },
+          { word: "WATER", type: "fill_blank", text: "Remember to drink a tall glass of cool ___ after playing outside." },
+          { word: "SMILE", type: "definition", text: "A cheerful facial expression showing pleasure with raised lips." },
+          { word: "DUCK", type: "fill_blank", text: "The yellow mother ___ swam across the stream with her ducklings." },
+          { word: "JUMP", type: "definition", text: "To push oneself off the ground into the air using your leg muscles." },
+          { word: "BLUE", type: "fill_blank", text: "On a bright sunny morning, the clear sky is beautiful and ___." },
+          { word: "CHAIR", type: "definition", text: "A piece of furniture with four legs and a backrest made for sitting." },
+          { word: "STAR", type: "fill_blank", text: "Look through the bedroom window to see a twinkling ___ at night." },
+          { word: "BREAD", type: "definition", text: "Food made from baked dough consisting of flour, yeast, and water." },
+          { word: "BOAT", type: "fill_blank", text: "The fisherman sailed his small wooden ___ across the calm lake." },
+          { word: "TRAIN", type: "definition", text: "A series of connected railway wagons or carriages pulled by an engine." },
+          { word: "HOUSE", type: "fill_blank", text: "Our cozy family ___ has a welcoming red front door." },
+          { word: "SLEEP", type: "definition", text: "A restorative natural state of rest where consciousness is suspended." },
+          { word: "RAIN", type: "fill_blank", text: "Grab your bright umbrella because cold ___ is falling outside." },
+          { word: "CLOCK", type: "definition", text: "A mechanical or digital device used to measure and display time." },
+          { word: "PARK", type: "fill_blank", text: "Children ride bicycles and play on the swings at the community ___." },
+          { word: "CAKE", type: "fill_blank", text: "Mom decorated a delicious chocolate birthday ___ with candles." },
+          { word: "LION", type: "definition", text: "A large tawny-colored cat celebrated as the mighty king of the jungle." },
+          { word: "BABY", type: "fill_blank", text: "The cute little ___ giggled softly in her wooden crib." },
+          { word: "BEAR", type: "definition", text: "A large, heavy wild mammal with thick fur and sharp claws." },
+          { word: "BALL", type: "fill_blank", text: "Kick the round soccer ___ straight into the goal net." },
+          { word: "DESK", type: "definition", text: "A piece of furniture with a flat top used for writing or studying." },
+          { word: "DOOR", type: "fill_blank", text: "Please knock gently before opening the classroom ___." },
+          { word: "FARM", type: "definition", text: "An area of land used for growing crops and rearing animals." },
+          { word: "FIRE", type: "fill_blank", text: "Campers gathered around the warm crackling ___ to toast marshmallows." },
+          { word: "FOOD", type: "definition", text: "Any nutritious substance that people or animals eat to live." },
+          { word: "GOLD", type: "fill_blank", text: "The champion athlete won a shining yellow ___ medal." },
+          { word: "HAND", type: "definition", text: "The end part of a person's arm beyond the wrist, with fingers." },
+          { word: "HEAD", type: "fill_blank", text: "Wear a protective helmet over your ___ while riding a bicycle." },
+          { word: "KING", type: "definition", text: "The male royal ruler of an independent country or kingdom." },
+          { word: "MOON", type: "fill_blank", text: "At night, the silver glowing ___ lights up the dark sky." },
+          { word: "NOSE", type: "definition", text: "The facial organ above the mouth used for smelling and breathing." },
+          { word: "PINK", type: "fill_blank", text: "Flamingos are famous for their beautiful pale ___ feathers." },
+          { word: "RING", type: "definition", text: "A small circular band of precious metal worn on a finger." },
+          { word: "ROPE", type: "fill_blank", text: "Students skipped and jumped over the long turning ___." },
+          { word: "SHIP", type: "definition", text: "A very large seafaring vessel that travels across deep oceans." },
+          { word: "SHOE", type: "fill_blank", text: "Tie the laces on your running ___ before jogging in the yard." },
+          { word: "SNOW", type: "definition", text: "Atmospheric water vapor frozen into ice crystals that fall in white flakes." },
+          { word: "SONG", type: "fill_blank", text: "The school choir sang a cheerful melodic ___ at assembly." },
+          { word: "TIGER", type: "definition", text: "A large Asian wild cat with distinctive black vertical stripes." },
+          { word: "TOWN", type: "fill_blank", text: "Our friendly seaside ___ has quaint shops and a library." },
+          { word: "WIND", type: "definition", text: "The natural perceptible movement of the air outside." },
+          { word: "WOOD", type: "fill_blank", text: "The craftsman carved a sturdy dining chair out of solid oak ___." },
+          { word: "COAT", type: "definition", text: "An outer piece of clothing with sleeves worn outdoors for warmth." },
+          { word: "CORN", type: "fill_blank", text: "Farmers harvested ears of sweet yellow ___ from the field." },
+          { word: "DRUM", type: "definition", text: "A percussion instrument sounded by being struck with sticks." },
+          { word: "LEAF", type: "fill_blank", text: "In autumn, a colorful dry ___ drifted down from the maple tree." },
+          { word: "NEST", type: "definition", text: "A structure built by a bird to lay eggs and shelter its young." },
+          { word: "ROAD", type: "fill_blank", text: "Look both ways carefully before crossing the busy street or ___." },
+          { word: "ROOM", type: "definition", text: "A partitioned space inside a building enclosed by walls." },
+          { word: "SEED", type: "fill_blank", text: "Plant a sunflower ___ in moist rich soil to watch it sprout." },
+          { word: "SOUP", type: "definition", text: "A liquid dish prepared by boiling vegetables or meat in water." },
+          { word: "TAIL", type: "fill_blank", text: "The excited puppy wagged its furry little ___ back and forth." },
+          { word: "WALL", type: "definition", text: "A continuous vertical brick or stone structure that encloses a space." },
+          { word: "WORM", type: "fill_blank", text: "An earthworm wriggled through the damp soil under the stones." },
+          { word: "BELL", type: "definition", text: "A hollow metallic cup that rings loudly when struck by a clapper." },
+          { word: "CAMP", type: "fill_blank", text: "Scouts pitched their green tents at the riverside summer ___." },
+          { word: "DEER", type: "definition", text: "A graceful herbivorous forest animal with hooves and antlers." },
+          { word: "GAME", type: "fill_blank", text: "Let's play a fun vocabulary puzzle ___ together during recess." },
+          { word: "HILL", type: "definition", text: "A naturally raised area of land, smaller than a high mountain." },
+          { word: "LAMP", type: "fill_blank", text: "Switch on the reading ___ beside your study table at night." },
+          { word: "MOUSE", type: "definition", text: "A small rodent with a pointed snout and long slender tail." },
+          { word: "ROCK", type: "fill_blank", text: "We skipped a smooth flat ___ across the mirror-like lake." },
+          { word: "TOY", type: "definition", text: "An object designed for children to play and imagine with." },
+          { word: "BIKE", type: "fill_blank", text: "Wear your helmet and pedal your two-wheeled ___ around the track." },
+          { word: "KITE", type: "definition", text: "A lightweight fabric frame flown in the wind on a tether line." },
+          { word: "POOL", type: "fill_blank", text: "Children practiced swimming laps in the clear blue community ___." },
+          { word: "BEAK", type: "definition", text: "The hard, pointed outer mouthparts of a bird." },
+          { word: "BEEF", type: "fill_blank", text: "For dinner, chef grilled tender slices of ___ with vegetables." },
+          { word: "BONE", type: "definition", text: "A hard, calcified structural part of an animal skeleton." },
+          { word: "BUSH", type: "fill_blank", text: "Red berries grew on the thick thorny green ___ in our backyard." },
+          { word: "CALF", type: "definition", text: "The young offspring of a domestic cow or bull." },
+          { word: "CLAW", type: "fill_blank", text: "The eagle grasped the branch firmly with its sharp curved ___." },
+          { word: "COW", type: "definition", text: "A domesticated bovine animal that provides milk and dairy products." },
+          { word: "DISH", type: "fill_blank", text: "Please wash your ceramic dinner ___ after eating your meal." },
+          { word: "EGG", type: "definition", text: "An oval reproductive body laid by female birds, often eaten." },
+          { word: "FLAG", type: "fill_blank", text: "The national striped ___ fluttered proudly atop the tall pole." },
+          { word: "GOAT", type: "definition", text: "A hardy horned ruminant mammal known for climbing steep rocks." },
+          { word: "HOLE", type: "fill_blank", text: "The rabbit dug a safe burrow ___ deep into the grassy ground." },
+          { word: "IRON", type: "definition", text: "A strong, magnetic silver-gray metal used in tools and building." },
+          { word: "JAM", type: "fill_blank", text: "Spread sweet strawberry ___ over your buttered breakfast toast." },
+          { word: "KNEE", type: "definition", text: "The joint between the thigh and the lower leg in humans." },
+          { word: "LAKE", type: "fill_blank", text: "We rowed a wooden canoe across the tranquil freshwater ___." },
+          { word: "MEAT", type: "definition", text: "The flesh of an animal as used for nourishing food." },
+          { word: "NAIL", type: "fill_blank", text: "Use a carpenter's steel hammer to strike the metal ___ into wood." },
+          { word: "OAK", type: "definition", text: "A large, sturdy deciduous tree known for producing acorns." },
+          { word: "PEAR", type: "fill_blank", text: "A sweet, juicy green ___ makes a healthy fruit snack at recess." },
+          { word: "PIG", type: "definition", text: "An omnivorous domesticated hoofed mammal with a snout." },
+          { word: "ROOF", type: "fill_blank", text: "Heavy raindrops tapped gently against the red clay tile ___." },
+          { word: "SAND", type: "definition", text: "Fine granular mineral particles found on seashores and deserts." },
+          { word: "SOIL", type: "fill_blank", text: "Earthworms enrich the dark, moist garden ___ for blooming flowers." },
+          { word: "TOOTH", type: "definition", text: "A hard, white calcified structure in the jaws used for chewing." },
+          { word: "VASE", type: "fill_blank", text: "Place the fresh fragrant roses inside the porcelain water ___." },
+          { word: "WOLF", type: "definition", text: "A wild carnivorous mammal of the dog family living in packs." },
+          { word: "YARN", type: "fill_blank", text: "Grandmother knitted a warm woolly scarf using soft yellow ___." },
+          { word: "ZOO", type: "definition", text: "An establishment that maintains a collection of wild animals." },
+          { word: "ANT", type: "fill_blank", text: "A tiny hardworking black ___ carried a crumb back to its colony." },
+          { word: "BARN", type: "definition", text: "A large farm building used for storing grain or housing livestock." },
+          { word: "CRAB", type: "fill_blank", text: "A red sea ___ scuttled sideways across the wet sandy beach." },
+          { word: "DUST", type: "definition", text: "Fine, dry powder consisting of tiny particles of earth or waste." },
+          { word: "FORK", type: "fill_blank", text: "Use your dinner spoon and metal ___ to eat the pasta neatly." },
+          { word: "GIFT", type: "definition", text: "A present given voluntarily to someone without payment." },
+          { word: "HAT", type: "fill_blank", text: "Wear a wide sun ___ to shield your eyes on hot sunny afternoons." },
+          { word: "INSECT", type: "definition", text: "A small invertebrate creature with six legs and usually wings." },
+          { word: "JEANS", type: "fill_blank", text: "He wore a comfortable blue cotton t-shirt and sturdy denim ___." },
+          { word: "LEMON", type: "definition", text: "A yellow citrus fruit with sour, highly acidic juice." },
+          { word: "MUG", type: "fill_blank", text: "Dad poured hot cocoa into his favorite ceramic travel ___." },
+          { word: "NUT", type: "definition", text: "A fruit consisting of a hard shell enclosing an edible kernel." },
+          { word: "OWL", type: "fill_blank", text: "A wise nocturnal ___ hooted softly from the tall oak branch." },
+          { word: "PET", type: "definition", text: "A domestic animal kept for companionship and affection." },
+          { word: "ROSE", type: "fill_blank", text: "A red velvety ___ blossomed beautifully in the flower garden." },
+          { word: "SALT", type: "definition", text: "A white crystalline mineral substance used to season food." },
+          { word: "TENT", type: "fill_blank", text: "Campers pitched their weatherproof green ___ beside the river." },
+          { word: "VEST", type: "definition", text: "A sleeveless garment worn over a shirt or next to the skin." },
+          { word: "WAVE", type: "fill_blank", text: "The surfer rode a foaming ocean ___ all the way to the shore." }
+        ],
+        medium: [
+          { word: "BRAVE", type: "definition", text: "Ready to face danger, difficulty, or pain without showing fear." },
+          { word: "FLIGHT", type: "fill_blank", text: "The passenger airplane boarded smoothly for its morning ___ to London." },
+          { word: "GARDEN", type: "definition", text: "A planned piece of land dedicated to cultivating flowers and vegetables." },
+          { word: "MARKET", type: "fill_blank", text: "Grandmother bought fresh tropical fruits at the busy weekend ___." },
+          { word: "SILENT", type: "definition", text: "Completely quiet and tranquil, without any noticeable sound or noise." },
+          { word: "WINTER", type: "fill_blank", text: "Children wear woolly coats and gloves during the cold days of ___." },
+          { word: "BRIDGE", type: "definition", text: "A structure built across a river, ravine, or road to allow passage." },
+          { word: "CASTLE", type: "fill_blank", text: "The noble medieval king lived in a magnificent stone ___ with towers." },
+          { word: "FOREST", type: "definition", text: "A large dense area dominated by towering trees and wild woodland animals." },
+          { word: "PLANET", type: "fill_blank", text: "Earth is the third rocky ___ orbiting safely around the Sun." },
+          { word: "SILVER", type: "definition", text: "A shiny, lustrous, greyish-white precious metallic element." },
+          { word: "CANDLE", type: "fill_blank", text: "Make a birthday wish before blowing out the glowing flame on the ___." },
+          { word: "MONKEY", type: "definition", text: "An agile, intelligent primate with a long tail that swings between trees." },
+          { word: "DOCTOR", type: "fill_blank", text: "When you have a fever, the kind clinic ___ checks your health." },
+          { word: "GUITAR", type: "definition", text: "A musical stringed instrument with a fretted fingerboard played by strumming." },
+          { word: "YELLOW", type: "fill_blank", text: "Sunflowers and fresh ripe bananas share a bright shade of ___." },
+          { word: "POCKET", type: "definition", text: "A small pouch-like bag sewn into clothing to store small personal items." },
+          { word: "SUMMER", type: "fill_blank", text: "Families visit the sandy beach during the warm and sunny days of ___." },
+          { word: "CLOUD", type: "definition", text: "A visible floating mass of condensed water vapor droplets in the sky." },
+          { word: "THUNDER", type: "fill_blank", text: "Following a bright flash of lightning, a booming roar of ___ echoed." },
+          { word: "SCHOOL", type: "definition", text: "An educational institution where pupils go to acquire knowledge and skills." },
+          { word: "FRIEND", type: "fill_blank", text: "A trustworthy ___ will always listen, share toys, and support you." },
+          { word: "WINDOW", type: "definition", text: "An aperture in a wall fitted with glass to admit daylight and fresh air." },
+          { word: "ORANGE", type: "fill_blank", text: "Peel the fragrant citrus skin to enjoy a healthy, sweet, juicy ___." },
+          { word: "ISLAND", type: "fill_blank", text: "The adventurous sailors discovered a tropical ___ surrounded by the ocean." },
+          { word: "ANIMAL", type: "definition", text: "A living multicellular organism that feeds on organic matter." },
+          { word: "BASKET", type: "fill_blank", text: "We carried red apples and sandwiches in a woven picnic ___." },
+          { word: "BOTTLE", type: "definition", text: "A glass or plastic container with a narrow neck used for storing liquids." },
+          { word: "CAMERA", type: "fill_blank", text: "Smile and look toward the lens of the digital ___ for our group photo." },
+          { word: "CARROT", type: "definition", text: "An orange-colored crunchy root vegetable rich in vitamin A." },
+          { word: "CHURCH", type: "fill_blank", text: "The village bell rang from the tall spire of the stone ___." },
+          { word: "CIRCUS", type: "definition", text: "A travelling show of acrobats, clowns, and trained performers." },
+          { word: "COUSIN", type: "fill_blank", text: "My aunt's daughter is my favorite ___ and we play together often." },
+          { word: "DESERT", type: "definition", text: "A dry, barren area of land with little precipitation and sandy dunes." },
+          { word: "DRAGON", type: "fill_blank", text: "The mythical green ___ breathed bright flames in the fantasy story." },
+          { word: "DRIVER", type: "definition", text: "A person who operates and steers a motor vehicle safely." },
+          { word: "ENGINE", type: "fill_blank", text: "The mechanic examined the powerful purring ___ beneath the car's hood." },
+          { word: "FAMILY", type: "definition", text: "A fundamental social group of parents and their children living together." },
+          { word: "FARMER", type: "fill_blank", text: "The hardworking ___ fed the cows and watered the organic crops." },
+          { word: "FLOWER", type: "definition", text: "The colorful seed-bearing blossom of a plant consisting of petals." },
+          { word: "FUTURE", type: "fill_blank", text: "Scientists develop amazing new technologies to make our ___ brighter." },
+          { word: "JUNGLE", type: "definition", text: "An area of land overgrown with dense forest and tangled vegetation." },
+          { word: "KITTEN", type: "fill_blank", text: "A tiny playful ___ chased after a ball of colored yarn." },
+          { word: "KNIGHT", type: "definition", text: "A medieval armored warrior granted an honorable title by a monarch." },
+          { word: "LADDER", type: "fill_blank", text: "The firefighter climbed the tall rescue ___ to reach the window." },
+          { word: "LEADER", type: "definition", text: "A person who guides, directs, or inspires a group or team." },
+          { word: "LESSON", type: "fill_blank", text: "Our English teacher explained a fascinating grammar ___ today." },
+          { word: "LETTER", type: "definition", text: "A written or typed formal message sent in an envelope to someone." },
+          { word: "MAGIC", type: "fill_blank", text: "The talented wizard performed an astonishing sleight of hand ___ trick." },
+          { word: "MIRROR", type: "definition", text: "A reflective surface, usually of silvered glass, that forms images." },
+          { word: "NATURE", type: "fill_blank", text: "Going for a hike in the woods helps us appreciate the beauty of ___." },
+          { word: "OCEAN", type: "definition", text: "A very large expanse of sea covering three-quarters of the Earth." },
+          { word: "PALACE", type: "fill_blank", text: "The royal sovereign greeted guests in the grand ballroom of the ___." },
+          { word: "PARENT", type: "definition", text: "A father or mother who nurtures and raises their children." },
+          { word: "PERSON", type: "fill_blank", text: "Always treat every single ___ with empathy, respect, and kindness." },
+          { word: "PICTURE", type: "definition", text: "A painting, drawing, or photograph showing a visual representation." },
+          { word: "POLICE", type: "fill_blank", text: "Courageous ___ officers keep the city safe from crime day and night." },
+          { word: "PURPLE", type: "definition", text: "A regal color intermediate between red and blue, like ripe grapes." },
+          { word: "RABBIT", type: "fill_blank", text: "A fluffy wild ___ nibbled on fresh green clover in the lawn." },
+          { word: "ROCKET", type: "definition", text: "A cylindrical spacecraft propelled through outer space by thrust." },
+          { word: "SHADOW", type: "fill_blank", text: "The tall pine tree cast a long cool ___ across the sunny grass." },
+          { word: "SISTER", type: "definition", text: "A female sibling with whom one shares the same parents." },
+          { word: "SPRING", type: "fill_blank", text: "Colorful tulips bloom and birds hatch during the season of ___." },
+          { word: "STREET", type: "definition", text: "A public road in a city or town with houses and shops on sides." },
+          { word: "TRAVEL", type: "fill_blank", text: "During the school holidays, our family plans to ___ to Penang." },
+          { word: "TURTLE", type: "definition", text: "A slow-moving reptile enclosed in a tough scaly bony shell." },
+          { word: "VALLEY", type: "fill_blank", text: "A sparkling clear river flowed gently through the lush green ___." },
+          { word: "VILLAGE", type: "definition", text: "A group of houses and buildings in a rural area smaller than a town." },
+          { word: "WORKER", type: "fill_blank", text: "Every dedicated construction ___ wore a yellow hardhat on site." },
+          { word: "DINNER", type: "definition", text: "The main evening meal of the day eaten together by the household." },
+          { word: "HAMMER", type: "fill_blank", text: "Use a carpenter's steel ___ to drive the nail firmly into wood." },
+          { word: "JACKET", type: "definition", text: "A mid-length garment for the upper body with sleeves and a zipper." },
+          { word: "PENCIL", type: "fill_blank", text: "Sharpen the graphite tip of your wooden ___ before drawing." },
+          { word: "ROBOT", type: "definition", text: "A machine capable of carrying out complex actions automatically." },
+          { word: "ARTIST", type: "fill_blank", text: "The creative ___ dipped his brush in watercolor paints." },
+          { word: "BEAUTY", type: "definition", text: "A combination of qualities that pleases the aesthetic senses." },
+          { word: "BLANKET", type: "fill_blank", text: "Pull the warm quilted ___ over yourself on chilly nights." },
+          { word: "BRANCH", type: "definition", text: "A wooden part of a tree growing out from the trunk." },
+          { word: "BUTTER", type: "fill_blank", text: "Spread creamy yellow ___ across the freshly toasted bread." },
+          { word: "CANYON", type: "definition", text: "A deep gorge, typically one with a river flowing through it." },
+          { word: "CARPET", type: "fill_blank", text: "Vacuum the patterned living room ___ before visitors arrive." },
+          { word: "CHEESE", type: "definition", text: "A food made from pressed milk curds, rich in protein." },
+          { word: "CIRCUS", type: "fill_blank", text: "Trapeze artists performed amazing acrobatic flips at the traveling ___." },
+          { word: "COOKIE", type: "definition", text: "A sweet baked snack that is usually small, flat, and crisp." },
+          { word: "CORNER", type: "fill_blank", text: "The cozy bookstore is located right around the street ___." },
+          { word: "COTTON", type: "definition", text: "A soft white fibrous substance surrounding the seeds of cotton plants." },
+          { word: "DANCER", type: "fill_blank", text: "The graceful ballet ___ leaped smoothly across the illuminated stage." },
+          { word: "DOLPHIN", type: "definition", text: "An intelligent marine mammal with a beaklike snout and curved dorsal fin." },
+          { word: "DRAWER", type: "fill_blank", text: "Neatly fold your socks and place them in the wooden dresser ___." },
+          { word: "FEATHER", type: "definition", text: "One of the light horny structures that form the plumage of birds." },
+          { word: "GARAGE", type: "fill_blank", text: "Dad parked the family electric vehicle securely inside the home ___." },
+          { word: "HELMET", type: "definition", text: "A hard protective hat worn by soldiers, cyclists, and riders." },
+          { word: "HONEY", type: "fill_blank", text: "Bees produce sweet golden ___ from flower nectar inside the hive." },
+          { word: "INSECT", type: "definition", text: "A six-legged small creature with segmented body parts." },
+          { word: "ISLAND", type: "definition", text: "A piece of land entirely surrounded by a body of water." },
+          { word: "KETTLE", type: "fill_blank", text: "The whistling tea ___ boiled hot water on the kitchen stove." },
+          { word: "LIZARD", type: "definition", text: "A reptile that typically has a long body, four legs, and a tail." },
+          { word: "MAGNET", type: "fill_blank", text: "The horseshoe ___ attracted paperclips and small iron pins." },
+          { word: "MUSEUM", type: "definition", text: "A building in which objects of historical interest are displayed." },
+          { word: "NAPKIN", type: "fill_blank", text: "Wipe your hands clean with a soft paper ___ after eating." },
+          { word: "NEEDLE", type: "definition", text: "A very thin, pointed steel tool with an eye for threading." },
+          { word: "PARROT", type: "fill_blank", text: "The tropical green ___ mimicked cheerful words spoken by its owner." },
+          { word: "PILLOW", type: "definition", text: "A soft cushion used to support the head during sleep." },
+          { word: "PUPPY", type: "fill_blank", text: "The energetic golden retriever ___ learned how to fetch a ball." },
+          { word: "RIVER", type: "definition", text: "A large natural stream of water flowing toward the sea." },
+          { word: "SAILOR", type: "fill_blank", text: "The experienced naval ___ guided the sailing vessel through the bay." },
+          { word: "SHADOW", type: "definition", text: "A dark shape produced by a body coming between rays of light." },
+          { word: "SILVER", type: "fill_blank", text: "The second place swimmer proudly wore her shining ___ medal." },
+          { word: "SPIDER", type: "definition", text: "An eight-legged predatory arachnid that spins silk webs." },
+          { word: "TICKET", type: "fill_blank", text: "Present your train boarding ___ to the conductor at the platform." },
+          { word: "TIGER", type: "fill_blank", text: "The striped Bengal ___ paced stealthily through tall grassland." },
+          { word: "TOMATO", type: "definition", text: "A glossy red, pulpy edible fruit eaten raw in salads or cooked." },
+          { word: "TUNNEL", type: "fill_blank", text: "The express train sped smoothly through the dark mountain ___." },
+          { word: "WALLET", type: "definition", text: "A pocket-sized flat folding case for holding money and cards." },
+          { word: "ZEBRA", type: "fill_blank", text: "A herd of African wild horses with black and white stripes is a ___." }
+        ],
+        hard: [
+          { word: "ANCIENT", type: "definition", text: "Belonging to the very distant historical past and no longer in existence." },
+          { word: "DELICIOUS", type: "fill_blank", text: "The freshly baked warm cinnamon rolls smelled and tasted ___." },
+          { word: "ADVENTURE", type: "definition", text: "An exciting, bold, and sometimes risky quest or undertaking." },
+          { word: "BEAUTIFUL", type: "fill_blank", text: "A vibrant double rainbow created a truly ___ view over the green valley." },
+          { word: "FRIENDLY", type: "definition", text: "Exhibiting genuine warmth, kindness, and welcoming hospitality toward others." },
+          { word: "MOUNTAIN", type: "fill_blank", text: "The brave climbers reached the snow-capped peak of the highest ___." },
+          { word: "DISCOVER", type: "definition", text: "To encounter, detect, or find something novel unexpectedly during research." },
+          { word: "TREASURE", type: "fill_blank", text: "The ancient map indicated an underground chest filled with sparkling gold ___." },
+          { word: "ELEPHANT", type: "definition", text: "A majestic, very large herbivorous mammal with a long trunk and ivory tusks." },
+          { word: "HOSPITAL", type: "fill_blank", text: "Dedicated nurses and doctors provide round-the-clock care in the ___." },
+          { word: "DINOSAUR", type: "definition", text: "A diverse group of prehistoric reptiles that dominated the Mesozoic era." },
+          { word: "EXPLORER", type: "fill_blank", text: "The courageous polar ___ crossed uncharted frozen glaciers on foot." },
+          { word: "VACATION", type: "definition", text: "An extended period of recreation spent away from school or work." },
+          { word: "WONDERFUL", type: "fill_blank", text: "Our class had a fantastic and ___ time participating in the school festival." },
+          { word: "CHAMPION", type: "definition", text: "A competitor or team that has vanquished all rivals in a tournament." },
+          { word: "MYSTERIOUS", type: "fill_blank", text: "The old locked wooden trunk held a secret code written in a ___ script." },
+          { word: "CELEBRATE", type: "definition", text: "To acknowledge a joyous event or victory with public or private festivities." },
+          { word: "BUTTERFLY", type: "fill_blank", text: "A delicate, colorful ___ flitted gracefully among the blooming flowers." },
+          { word: "BRILLIANT", type: "definition", text: "Exceptionally clever, intellectually talented, or vividly glittering with light." },
+          { word: "FANTASTIC", type: "fill_blank", text: "The science museum presented a ___ exhibition about outer space exploration." },
+          { word: "KNOWLEDGE", type: "definition", text: "Facts, information, and theoretical comprehension acquired through study." },
+          { word: "TELESCOPE", type: "fill_blank", text: "Astronomers gaze through an observatory ___ to study distant star systems." },
+          { word: "ASTRONAUT", type: "definition", text: "A person trained to travel and conduct experiments in outer space." },
+          { word: "CHOCOLATE", type: "fill_blank", text: "Mom bought creamy sweet ___ cookies for our afternoon snack." },
+          { word: "CLASSROOM", type: "definition", text: "A dedicated room in an academic school where students attend lessons." },
+          { word: "COMMUNITY", type: "fill_blank", text: "Neighbors worked together to clean and beautify their local ___ park." },
+          { word: "DANGEROUS", type: "definition", text: "Likely to cause physical harm, injury, or adverse damage; not safe." },
+          { word: "DIFFERENT", type: "fill_blank", text: "Every pupil in our multicultural classroom brings unique and ___ talents." },
+          { word: "EDUCATION", type: "definition", text: "The process of receiving systematic instruction, especially at school." },
+          { word: "EVERYTHING", type: "fill_blank", text: "Double-check your schoolbag to ensure you packed ___ for class." },
+          { word: "EXCELLENT", type: "definition", text: "Extremely good, of superior quality, or achieving an outstanding standard." },
+          { word: "EXCITEMENT", type: "fill_blank", text: "Cheers and energetic ___ filled the stadium when the home team scored." },
+          { word: "IMPORTANT", type: "definition", text: "Of great significance, high value, or consequence; essential." },
+          { word: "IMPOSSIBLE", type: "fill_blank", text: "With hard work and perseverance, nothing you dream of is truly ___." },
+          { word: "INVENTOR", type: "definition", text: "A creative person who designs or produces a novel process or device." },
+          { word: "JOURNEY", type: "fill_blank", text: "The adventurous travelers embarked on an epic overland ___ to Asia." },
+          { word: "LIGHTNING", type: "definition", text: "A powerful natural electrostatic discharge occurring within a storm." },
+          { word: "MAGICIAN", type: "fill_blank", text: "The talented ___ pulled a white rabbit out of an empty top hat." },
+          { word: "MEDICINE", type: "definition", text: "A substance or preparation used in treating disease or illness." },
+          { word: "MUSICIAN", type: "fill_blank", text: "The skilled violin ___ played a touching sonata on stage." },
+          { word: "NEIGHBOR", type: "definition", text: "A person who lives next door to or very near another resident." },
+          { word: "PASSENGER", type: "fill_blank", text: "Every train ___ fastened their seatbelt and showed their ticket." },
+          { word: "POWERFUL", type: "definition", text: "Having great power, physical force, or substantial influence." },
+          { word: "PRINCESS", type: "fill_blank", text: "The kind fairy-tale ___ ruled the peaceful kingdom with wisdom." },
+          { word: "PROFESSOR", type: "definition", text: "A university academic of the highest rank who teaches and researches." },
+          { word: "QUESTION", type: "fill_blank", text: "Raise your hand politely if you have an inquiring ___ for the teacher." },
+          { word: "SCIENTIST", type: "definition", text: "A person who conducts systematic study to gain scientific knowledge." },
+          { word: "SKELETON", type: "fill_blank", text: "The natural internal framework of bone that supports an animal is a ___." },
+          { word: "SOMEWHERE", type: "definition", text: "In, at, or to some unspecified or unknown place or location." },
+          { word: "STRAWBERRY", type: "fill_blank", text: "We topped our vanilla ice cream with fresh sweet red ___ slices." },
+          { word: "SURPRISE", type: "definition", text: "An unexpected or astonishing event, occurrence, or gift." },
+          { word: "TOGETHER", type: "fill_blank", text: "Best friends work and laugh ___ to solve tough problems happily." },
+          { word: "TOMORROW", type: "definition", text: "On the day following the present day; the immediate future." },
+          { word: "TRIANGLE", type: "fill_blank", text: "A geometric polygon that has three straight sides and three angles is a ___." },
+          { word: "UMBRELLA", type: "definition", text: "A circular canopy mounted on a folding metal frame to shield from rain." },
+          { word: "UNIVERSE", type: "fill_blank", text: "Billions of radiant galaxies and star systems span across our vast ___." },
+          { word: "WATERFALL", type: "definition", text: "A cascade of water falling from a height over a precipice into a river." },
+          { word: "WILDLIFE", type: "fill_blank", text: "National nature reserves protect endangered ___ from loss of habitat." },
+          { word: "YESTERDAY", type: "definition", text: "On the day immediately before today; the previous 24 hours." },
+          { word: "AIRPLANE", type: "fill_blank", text: "A passenger ___ flew high above the white clouds toward Tokyo." },
+          { word: "CALENDAR", type: "definition", text: "A chart or page showing the days, weeks, and months of a particular year." },
+          { word: "COMPUTER", type: "fill_blank", text: "Students practiced typing essays on their personal classroom ___." },
+          { word: "FOOTBALL", type: "definition", text: "A popular team game played with a spherical ball kicked between goals." },
+          { word: "LANGUAGE", type: "fill_blank", text: "Mastering the English ___ helps students communicate worldwide." },
+          { word: "MIDNIGHT", type: "definition", text: "Twelve o'clock at night; the exact middle of the night." },
+          { word: "OLYMPICS", type: "fill_blank", text: "Elite international athletes compete for medals at the Summer ___." },
+          { word: "RAINBOW", type: "definition", text: "An optical arc of spectral colors appearing in the sky after rainfall." },
+          { word: "SANDWICH", type: "fill_blank", text: "Dad prepared a healthy grilled cheese ___ with fresh tomatoes." },
+          { word: "SUNSHINE", type: "definition", text: "Direct radiant sunlight unbroken by clouds, providing warmth." },
+          { word: "AQUARIUM", type: "definition", text: "A transparent tank or public facility of water in which fish and aquatic creatures live." },
+          { word: "BACKPACK", type: "fill_blank", text: "Zip up your school ___ before walking home with your notebooks." },
+          { word: "BUILDING", type: "definition", text: "A permanent structure with a roof and walls, such as a school or house." },
+          { word: "CAROUSEL", type: "fill_blank", text: "Children rode painted wooden horses on the merry-go-round ___." },
+          { word: "DAUGHTER", type: "definition", text: "A female child or person in relation to her parents." },
+          { word: "FIREWORK", type: "fill_blank", text: "A sparkling colorful ___ exploded across the dark night sky on New Year's Eve." },
+          { word: "GIRAFFE", type: "definition", text: "A very tall African mammal with a very long neck and spotted coat." },
+          { word: "HOLIDAY", type: "fill_blank", text: "Families celebrate and enjoy leisure time during the public school ___." },
+          { word: "LIBRARY", type: "definition", text: "A building containing collections of books and periodicals for reading." },
+          { word: "OCTOPUS", type: "fill_blank", text: "An intelligent sea creature with eight flexible tentacles is an ___." },
+          { word: "PAVEMENT", type: "definition", text: "A paved footpath or walkway along the side of a street for pedestrians." },
+          { word: "POLLUTION", type: "fill_blank", text: "Planting more green trees helps clean the air from toxic smoke and ___." },
+          { word: "RECYCLE", type: "definition", text: "To convert waste materials into reusable objects to protect nature." },
+          { word: "SEASHELL", type: "fill_blank", text: "We walked along the sandy coastline collecting a smooth spiral ___." },
+          { word: "SUBMARINE", type: "definition", text: "A warship designed to operate submerged deep underwater in the sea." },
+          { word: "SUNFLOWER", type: "fill_blank", text: "The tall yellow ___ turned its bright face toward the morning sun." },
+          { word: "VOLCANO", type: "definition", text: "A mountain or hill having a crater through which lava and rock erupt." },
+          { word: "WINDMILL", type: "fill_blank", text: "The large rotating blades of the modern ___ generate clean green electricity." }
+        ]
+      };
+
+      // 3. APPLICATION STATE & SMART NON-REPEATING DECK
+      const state = {
+        studentName: "",
+        studentClass: "",
+        difficulty: "medium",
+        gridSize: 11,
+        grid: [],
+        placedWords: [],
+        activeWord: null,
+        activeDir: "across",
+        selectedRow: -1,
+        selectedCol: -1,
+        activeClueTab: "across",
+        timerInterval: null,
+        secondsElapsed: 0,
+        hintsUsed: 0,
+        score: 0,
+        completedTime: "",
+        allScores: []
+      };
+
+      // Helper: Non-repeating deck tracking per difficulty
+      // Ensures students can play 20+ games without repeating the same words!
+      function getUnusedWordPool(difficulty) {
+        const full = VOCAB_POOLS[difficulty] || [];
+        let used = [];
+        try {
+          used = JSON.parse(localStorage.getItem(`cefr_played_words_${difficulty}`) || "[]");
+        } catch (e) {
+          used = [];
+        }
+
+        let available = full.filter(item => !used.includes(item.word));
+
+        // When fewer than 10 words remain unused in this level, recycle the deck!
+        // Preserve the immediate last game's words so they don't repeat right away
+        if (available.length < 10) {
+          const keepRecent = used.slice(-7);
+          try {
+            localStorage.setItem(`cefr_played_words_${difficulty}`, JSON.stringify(keepRecent));
+          } catch (e) {}
+          available = full.filter(item => !keepRecent.includes(item.word));
+          if (available.length < 5) available = [...full];
+        }
+
+        return available;
+      }
+
+      function markWordsPlayed(difficulty, wordsList) {
+        try {
+          let used = JSON.parse(localStorage.getItem(`cefr_played_words_${difficulty}`) || "[]");
+          wordsList.forEach(w => {
+            if (!used.includes(w)) used.push(w);
+          });
+          localStorage.setItem(`cefr_played_words_${difficulty}`, JSON.stringify(used));
+        } catch (e) {}
+      }
+
+      // 4. DYNAMIC CROSSWORD GENERATOR (NON-REPEATING & HIGH DIVERSITY)
+      function generateCrosswordPuzzle(difficulty) {
+        // Fetch candidates exclusively from the unplayed deck
+        let pool = getUnusedWordPool(difficulty);
+
+        // High-entropy Fisher-Yates shuffle of the entire available pool
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+
+        const GRID_DIM = difficulty === 'hard' ? 12 : 11;
+        state.gridSize = GRID_DIM;
+
+        let bestResult = null;
+        let maxPlaced = 0;
+
+        // Try up to 35 attempts testing different seed words from pool
+        const numTrials = Math.min(pool.length, 35);
+        for (let attempt = 0; attempt < numTrials; attempt++) {
+          const grid = Array.from({ length: GRID_DIM }, () => Array.from({ length: GRID_DIM }, () => null));
+          const placed = [];
+
+          // Pick seed word from the shuffled unplayed pool
+          const seed = pool[attempt];
+          if (!seed || seed.word.length >= GRID_DIM) continue;
+
+          const startCol = Math.max(1, Math.floor((GRID_DIM - seed.word.length) / 2));
+          const startRow = Math.max(1, Math.floor(GRID_DIM / 2) - 1);
+
+          placeWordOnGrid(grid, seed.word, startRow, startCol, 'across');
+          placed.push({
+            word: seed.word,
+            type: seed.type,
+            text: seed.text,
+            row: startRow,
+            col: startCol,
+            dir: 'across'
+          });
+
+          // Test placing other candidate words from the unplayed pool
+          for (let w = 0; w < pool.length; w++) {
+            if (w === attempt) continue;
+            const candidate = pool[w];
+            if (placed.some(p => p.word === candidate.word)) continue;
+
+            const bestPlacement = findBestIntersection(grid, candidate.word, placed, GRID_DIM);
+            if (bestPlacement) {
+              placeWordOnGrid(grid, candidate.word, bestPlacement.row, bestPlacement.col, bestPlacement.dir);
+              placed.push({
+                word: candidate.word,
+                type: candidate.type,
+                text: candidate.text,
+                row: bestPlacement.row,
+                col: bestPlacement.col,
+                dir: bestPlacement.dir
+              });
+              if (placed.length >= 7) break; // Optimal puzzle size reached
+            }
+          }
+
+          if (placed.length > maxPlaced) {
+            maxPlaced = placed.length;
+            bestResult = { grid, placed };
+            if (placed.length >= 6) break; // Excellent puzzle found!
+          }
+        }
+
+        // If high-density placement placed at least 4 words, use it!
+        if (!bestResult || bestResult.placed.length < 4) {
+          // Dynamic pair connector from unplayed pool to ensure ZERO static repetition
+          bestResult = generateDynamicPairPuzzle(pool, GRID_DIM);
+        }
+
+        // Mark placed words as played in localStorage so they won't repeat in next rounds
+        const wordsUsed = bestResult.placed.map(p => p.word);
+        markWordsPlayed(difficulty, wordsUsed);
+
+        assignClueNumbers(bestResult.grid, bestResult.placed, GRID_DIM);
+        state.grid = bestResult.grid;
+        state.placedWords = bestResult.placed;
+      }
+
+      // Dynamic fallback that finds intersecting pairs directly from unplayed pool
+      function generateDynamicPairPuzzle(pool, dim) {
+        const grid = Array.from({ length: dim }, () => Array.from({ length: dim }, () => null));
+        const placed = [];
+
+        for (let i = 0; i < pool.length; i++) {
+          const w1 = pool[i];
+          if (w1.word.length > dim - 2) continue;
+
+          for (let j = i + 1; j < pool.length; j++) {
+            const w2 = pool[j];
+            if (w2.word.length > dim - 2) continue;
+
+            // Find common letter
+            for (let c1 = 0; c1 < w1.word.length; c1++) {
+              for (let c2 = 0; c2 < w2.word.length; c2++) {
+                if (w1.word[c1] === w2.word[c2]) {
+                  const r1 = 3;
+                  const c1Start = Math.max(1, Math.floor((dim - w1.word.length) / 2));
+                  const r2Start = r1 - c2;
+                  const c2Pos = c1Start + c1;
+
+                  if (r2Start >= 1 && r2Start + w2.word.length < dim && c1Start >= 1 && c1Start + w1.word.length < dim) {
+                    placeWordOnGrid(grid, w1.word, r1, c1Start, 'across');
+                    placed.push({ word: w1.word, type: w1.type, text: w1.text, row: r1, col: c1Start, dir: 'across' });
+
+                    placeWordOnGrid(grid, w2.word, r2Start, c2Pos, 'down');
+                    placed.push({ word: w2.word, type: w2.type, text: w2.text, row: r2Start, col: c2Pos, dir: 'down' });
+
+                    // Try to attach 2 more words to this pair
+                    for (let k = 0; k < pool.length; k++) {
+                      if (k === i || k === j) continue;
+                      const w3 = pool[k];
+                      const pos = findBestIntersection(grid, w3.word, placed, dim);
+                      if (pos) {
+                        placeWordOnGrid(grid, w3.word, pos.row, pos.col, pos.dir);
+                        placed.push({ word: w3.word, type: w3.type, text: w3.text, row: pos.row, col: pos.col, dir: pos.dir });
+                        if (placed.length >= 5) break;
+                      }
+                    }
+
+                    if (placed.length >= 3) return { grid, placed };
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Return whatever was placed
+        return { grid, placed };
+      }
+
+      function placeWordOnGrid(grid, word, r, c, dir) {
+        for (let i = 0; i < word.length; i++) {
+          const curR = dir === 'across' ? r : r + i;
+          const curC = dir === 'across' ? c + i : c;
+          grid[curR][curC] = word[i];
+        }
+      }
+
+      function findBestIntersection(grid, word, placedList, dim) {
+        const validPlacements = [];
+
+        for (const placed of placedList) {
+          const targetDir = placed.dir === 'across' ? 'down' : 'across';
+
+          for (let i = 0; i < word.length; i++) {
+            const letter = word[i];
+
+            for (let j = 0; j < placed.word.length; j++) {
+              if (placed.word[j] === letter) {
+                const interR = placed.dir === 'across' ? placed.row : placed.row + j;
+                const interC = placed.dir === 'across' ? placed.col + j : placed.col;
+
+                const startR = targetDir === 'across' ? interR : interR - i;
+                const startC = targetDir === 'across' ? interC - i : interC;
+
+                if (canPlaceWord(grid, word, startR, startC, targetDir, dim)) {
+                  validPlacements.push({
+                    row: startR,
+                    col: startC,
+                    dir: targetDir
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        if (validPlacements.length === 0) return null;
+        return validPlacements[Math.floor(Math.random() * validPlacements.length)];
+      }
+
+      function canPlaceWord(grid, word, r, c, dir, dim) {
+        const len = word.length;
+        if (dir === 'across') {
+          if (r < 0 || r >= dim || c < 0 || c + len > dim) return false;
+          if (c > 0 && grid[r][c - 1] !== null) return false;
+          if (c + len < dim && grid[r][c + len] !== null) return false;
+
+          for (let i = 0; i < len; i++) {
+            const curCell = grid[r][c + i];
+            const neededChar = word[i];
+            if (curCell !== null) {
+              if (curCell !== neededChar) return false;
+            } else {
+              if (r > 0 && grid[r - 1][c + i] !== null) return false;
+              if (r < dim - 1 && grid[r + 1][c + i] !== null) return false;
+            }
+          }
+        } else {
+          if (c < 0 || c >= dim || r < 0 || r + len > dim) return false;
+          if (r > 0 && grid[r - 1][c] !== null) return false;
+          if (r + len < dim && grid[r + len][c] !== null) return false;
+
+          for (let i = 0; i < len; i++) {
+            const curCell = grid[r + i][c];
+            const neededChar = word[i];
+            if (curCell !== null) {
+              if (curCell !== neededChar) return false;
+            } else {
+              if (c > 0 && grid[r + i][c - 1] !== null) return false;
+              if (c < dim - 1 && grid[r + i][c + 1] !== null) return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      function assignClueNumbers(grid, placedList, dim) {
+        placedList.sort((a, b) => {
+          if (a.row !== b.row) return a.row - b.row;
+          return a.col - b.col;
+        });
+
+        const starts = new Map();
+        let curNum = 1;
+
+        placedList.forEach(item => {
+          const key = `${item.row},${item.col}`;
+          if (!starts.has(key)) {
+            starts.set(key, curNum++);
+          }
+          item.number = starts.get(key);
+        });
+      }
+
+      // 5. GRID RENDERING & CLUES DISPLAY
+      function renderCrosswordGrid() {
+        const container = document.getElementById("crossword-container");
+        container.innerHTML = "";
+
+        const dim = state.gridSize;
+        container.style.gridTemplateColumns = `repeat(${dim}, minmax(0, 1fr))`;
+        container.style.gridTemplateRows = `repeat(${dim}, minmax(0, 1fr))`;
+
+        const cellNumberMap = new Map();
+        state.placedWords.forEach(w => {
+          const key = `${w.row},${w.col}`;
+          if (!cellNumberMap.has(key)) {
+            cellNumberMap.set(key, w.number);
+          }
+        });
+
+        for (let r = 0; r < dim; r++) {
+          for (let c = 0; c < dim; c++) {
+            const cell = document.createElement("div");
+            cell.className = "grid-cell";
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+
+            const letter = state.grid[r][c];
+            if (letter === null) {
+              cell.classList.add("black-cell");
+            } else {
+              const key = `${r},${c}`;
+              if (cellNumberMap.has(key)) {
+                const numSpan = document.createElement("span");
+                numSpan.className = "cell-number";
+                numSpan.textContent = cellNumberMap.get(key);
+                cell.appendChild(numSpan);
+              }
+
+              const input = document.createElement("input");
+              input.type = "text";
+              input.maxLength = 1;
+              input.autocomplete = "off";
+              input.autocorrect = "off";
+              input.autocapitalize = "characters";
+              input.spellcheck = false;
+
+              input.addEventListener("input", (e) => onCellInput(e, r, c));
+              input.addEventListener("keydown", (e) => onCellKeyDown(e, r, c));
+              input.addEventListener("click", () => onCellClick(r, c));
+              input.addEventListener("focus", () => onCellFocus(r, c));
+
+              cell.appendChild(input);
+            }
+
+            container.appendChild(cell);
+          }
+        }
+
+        renderCluesList();
+        selectFirstWord();
+      }
+
+      function renderCluesList() {
+        const acrossWords = state.placedWords.filter(p => p.dir === 'across').sort((a,b) => a.number - b.number);
+        const downWords = state.placedWords.filter(p => p.dir === 'down').sort((a,b) => a.number - b.number);
+
+        document.getElementById("count-across").textContent = acrossWords.length;
+        document.getElementById("count-down").textContent = downWords.length;
+        document.getElementById("clues-total-badge").textContent = `${state.placedWords.length} words`;
+
+        renderClueItemsForActiveTab();
+      }
+
+      function switchClueTab(dir) {
+        state.activeClueTab = dir;
+        document.getElementById("tab-btn-across").classList.toggle("active", dir === 'across');
+        document.getElementById("tab-btn-down").classList.toggle("active", dir === 'down');
+        renderClueItemsForActiveTab();
+      }
+
+      function renderClueItemsForActiveTab() {
+        const listContainer = document.getElementById("clues-list");
+        listContainer.innerHTML = "";
+
+        const dirWords = state.placedWords
+          .filter(p => p.dir === state.activeClueTab)
+          .sort((a,b) => a.number - b.number);
+
+        dirWords.forEach(w => {
+          const item = document.createElement("div");
+          item.className = "clue-item";
+          item.id = `clue-item-${w.number}-${w.dir}`;
+          if (state.activeWord && state.activeWord.number === w.number && state.activeWord.dir === w.dir) {
+            item.classList.add("active-clue");
+          }
+
+          const meta = document.createElement("div");
+          meta.className = "clue-meta";
+
+          const num = document.createElement("span");
+          num.className = "clue-num";
+          num.textContent = `${w.number}.`;
+
+          const tag = document.createElement("span");
+          tag.className = `clue-tag ${w.type === 'definition' ? 'tag-def' : 'tag-blank'}`;
+          tag.textContent = w.type === 'definition' ? 'Def' : 'Blank';
+
+          const len = document.createElement("span");
+          len.className = "clue-len";
+          len.textContent = `(${w.word.length} letters)`;
+
+          meta.appendChild(num);
+          meta.appendChild(tag);
+          meta.appendChild(len);
+
+          const text = document.createElement("div");
+          text.className = "clue-text";
+          text.textContent = w.text;
+
+          item.appendChild(meta);
+          item.appendChild(text);
+
+          item.addEventListener("click", () => {
+            selectWord(w);
+          });
+
+          listContainer.appendChild(item);
+        });
+      }
+
+      // 6. INTERACTIVE NAVIGATION & TYPING LOGIC (NO PAGE JUMPING ON DELETE)
+      function selectFirstWord() {
+        if (state.placedWords.length > 0) {
+          selectWord(state.placedWords[0]);
+        }
+      }
+
+      function selectWord(wordObj) {
+        state.activeWord = wordObj;
+        state.activeDir = wordObj.dir;
+        state.selectedRow = wordObj.row;
+        state.selectedCol = wordObj.col;
+
+        if (state.activeClueTab !== wordObj.dir) {
+          switchClueTab(wordObj.dir);
+        }
+
+        highlightActiveWord();
+        focusCell(wordObj.row, wordObj.col);
+      }
+
+      function onCellClick(r, c) {
+        const candidates = state.placedWords.filter(p => isCellInWord(r, c, p));
+        if (candidates.length === 0) return;
+
+        if (candidates.length > 1 && state.selectedRow === r && state.selectedCol === c) {
+          const newDir = state.activeDir === 'across' ? 'down' : 'across';
+          const match = candidates.find(p => p.dir === newDir);
+          if (match) {
+            state.activeWord = match;
+            state.activeDir = newDir;
+            if (state.activeClueTab !== newDir) {
+              switchClueTab(newDir);
+            }
+          }
+        } else {
+          const match = candidates.find(p => p.dir === state.activeDir) || candidates[0];
+          state.activeWord = match;
+          state.activeDir = match.dir;
+          if (state.activeClueTab !== match.dir) {
+            switchClueTab(match.dir);
+          }
+        }
+
+        state.selectedRow = r;
+        state.selectedCol = c;
+        highlightActiveWord();
+      }
+
+      function onCellFocus(r, c) {
+        state.selectedRow = r;
+        state.selectedCol = c;
+        const candidates = state.placedWords.filter(p => isCellInWord(r, c, p));
+        if (candidates.length > 0) {
+          if (!state.activeWord || !isCellInWord(r, c, state.activeWord)) {
+            const match = candidates.find(p => p.dir === state.activeDir) || candidates[0];
+            state.activeWord = match;
+            state.activeDir = match.dir;
+            if (state.activeClueTab !== match.dir) {
+              switchClueTab(match.dir);
+            }
+          }
+        }
+        highlightActiveWord();
+      }
+
+      function isCellInWord(r, c, word) {
+        if (word.dir === 'across') {
+          return word.row === r && c >= word.col && c < word.col + word.word.length;
+        } else {
+          return word.col === c && r >= word.row && r < word.row + word.word.length;
+        }
+      }
+
+      function highlightActiveWord() {
+        document.querySelectorAll(".grid-cell").forEach(c => {
+          c.classList.remove("active-word", "active-cell");
+        });
+
+        if (!state.activeWord) return;
+
+        const w = state.activeWord;
+        for (let i = 0; i < w.word.length; i++) {
+          const r = w.dir === 'across' ? w.row : w.row + i;
+          const c = w.dir === 'across' ? w.col + i : w.col;
+          const cell = getCellElement(r, c);
+          if (cell) {
+            cell.classList.add("active-word");
+          }
+        }
+
+        const activeCell = getCellElement(state.selectedRow, state.selectedCol);
+        if (activeCell) {
+          activeCell.classList.add("active-cell");
+        }
+
+        document.querySelectorAll(".clue-item").forEach(item => item.classList.remove("active-clue"));
+        const activeClueEl = document.getElementById(`clue-item-${w.number}-${w.dir}`);
+        if (activeClueEl) {
+          activeClueEl.classList.add("active-clue");
+          const listContainer = document.getElementById("clues-list");
+          if (listContainer) {
+            const itemTop = activeClueEl.offsetTop - listContainer.offsetTop;
+            listContainer.scrollTo({ top: Math.max(0, itemTop - 8), behavior: 'smooth' });
+          }
+        }
+
+        const banner = document.getElementById("active-clue-banner");
+        if (banner) {
+          const dirLabel = w.dir === 'across' ? 'Across' : 'Down';
+          banner.innerHTML = `<span style="color:var(--text-gold); font-weight:800; margin-right:4px;">${w.number} ${dirLabel}:</span> <span>${escapeHtml(w.text)}</span> <span style="color:#ffffff; font-weight:bold; margin-left:4px;">(${w.word.length} letters)</span>`;
+        }
+      }
+
+      function getCellElement(r, c) {
+        return document.querySelector(`.grid-cell[data-row="${r}"][data-col="${c}"]`);
+      }
+
+      function getCellInput(r, c) {
+        const cell = getCellElement(r, c);
+        return cell ? cell.querySelector("input") : null;
+      }
+
+      // Safe Cell Focus without triggering page jumps
+      function focusCell(r, c) {
+        const input = getCellInput(r, c);
+        if (input) {
+          input.focus({ preventScroll: true });
+          try {
+            input.setSelectionRange(input.value.length, input.value.length);
+          } catch (err) {}
+        }
+      }
+
+      function onCellInput(e, r, c) {
+        const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+        e.target.value = val;
+
+        if (val.length > 0 && state.activeWord) {
+          advanceFocus(r, c, 1);
+        }
+      }
+
+      // Delete and Backspace handling: strictly preventScroll to eliminate up/down bouncing
+      function onCellKeyDown(e, r, c) {
+        if (e.key === "Backspace") {
+          e.preventDefault();
+          const input = getCellInput(r, c);
+          if (input && input.value !== "") {
+            input.value = "";
+            advanceFocus(r, c, -1);
+          } else {
+            advanceFocus(r, c, -1);
+            const prevInput = getCellInput(state.selectedRow, state.selectedCol);
+            if (prevInput) {
+              prevInput.value = "";
+            }
+          }
+        } else if (e.key === "Delete") {
+          e.preventDefault();
+          const input = getCellInput(r, c);
+          if (input) input.value = "";
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          moveCursor(0, 1);
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          moveCursor(0, -1);
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          moveCursor(1, 0);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          moveCursor(-1, 0);
+        } else if (e.key === "Tab") {
+          e.preventDefault();
+          cycleNextWord(e.shiftKey ? -1 : 1);
+        }
+      }
+
+      function advanceFocus(r, c, step) {
+        if (!state.activeWord) return;
+        const w = state.activeWord;
+
+        let nextR = r;
+        let nextC = c;
+
+        if (w.dir === 'across') {
+          nextC += step;
+          if (nextC >= w.col && nextC < w.col + w.word.length) {
+            focusCell(nextR, nextC);
+          }
+        } else {
+          nextR += step;
+          if (nextR >= w.row && nextR < w.row + w.word.length) {
+            focusCell(nextR, nextC);
+          }
+        }
+      }
+
+      function moveCursor(dRow, dCol) {
+        let nR = state.selectedRow + dRow;
+        let nC = state.selectedCol + dCol;
+
+        if (nR >= 0 && nR < state.gridSize && nC >= 0 && nC < state.gridSize) {
+          if (state.grid[nR][nC] !== null) {
+            focusCell(nR, nC);
+          }
+        }
+      }
+
+      function cycleNextWord(dir) {
+        const idx = state.placedWords.indexOf(state.activeWord);
+        const nextIdx = (idx + dir + state.placedWords.length) % state.placedWords.length;
+        selectWord(state.placedWords[nextIdx]);
+      }
+
+      // 7. QUIZ ACTIONS: CHECK ANSWERS, HINT, SUBMIT
+      function checkAnswers() {
+        let totalCells = 0;
+        let correctCells = 0;
+        let filledCount = 0;
+
+        for (let r = 0; r < state.gridSize; r++) {
+          for (let c = 0; c < state.gridSize; c++) {
+            const expected = state.grid[r][c];
+            if (expected !== null) {
+              totalCells++;
+              const cell = getCellElement(r, c);
+              const input = getCellInput(r, c);
+              const val = input ? input.value.toUpperCase().trim() : "";
+
+              cell.classList.remove("cell-correct", "cell-incorrect");
+
+              if (val === expected) {
+                cell.classList.add("cell-correct");
+                correctCells++;
+                filledCount++;
+              } else if (val !== "") {
+                cell.classList.add("cell-incorrect");
+                filledCount++;
+              }
+            }
+          }
+        }
+
+        setTimeout(() => {
+          document.querySelectorAll(".grid-cell").forEach(c => {
+            c.classList.remove("cell-incorrect");
+          });
+        }, 2500);
+
+        if (filledCount === 0) {
+          alert("Type letters into the crossword puzzle cells first!");
+          return;
+        }
+
+        if (correctCells === totalCells) {
+          alert("🌟 Outstanding! All your entered letters are 100% correct! Click 'Submit Crossword' to get your certificate.");
+        } else {
+          alert(`🔍 Progress Check: ${correctCells} out of ${totalCells} letters are correct. Keep going!`);
+        }
+      }
+
+      function provideHint() {
+        if (state.selectedRow === -1 || state.selectedCol === -1) {
+          alert("Please click on any crossword cell first where you would like a hint letter revealed!");
+          return;
+        }
+
+        const r = state.selectedRow;
+        const c = state.selectedCol;
+        const correctLetter = state.grid[r][c];
+
+        if (!correctLetter) {
+          alert("Please click an active crossword letter cell.");
+          return;
+        }
+
+        const input = getCellInput(r, c);
+        const cell = getCellElement(r, c);
+
+        if (input) {
+          if (input.value.toUpperCase() === correctLetter) {
+            alert("This cell already has the correct letter!");
+            return;
+          }
+
+          input.value = correctLetter;
+          state.hintsUsed++;
+          document.getElementById("quiz-hints-count").textContent = `${state.hintsUsed} hint${state.hintsUsed === 1 ? '' : 's'}`;
+
+          cell.classList.add("cell-hinted");
+          cell.classList.remove("cell-incorrect");
+          cell.classList.add("cell-correct");
+
+          advanceFocus(r, c, 1);
+        }
+      }
+
+      function confirmSubmitCrossword() {
+        let totalCells = 0;
+        let filledCount = 0;
+        let correctCount = 0;
+
+        for (let r = 0; r < state.gridSize; r++) {
+          for (let c = 0; c < state.gridSize; c++) {
+            const expected = state.grid[r][c];
+            if (expected !== null) {
+              totalCells++;
+              const input = getCellInput(r, c);
+              const val = input ? input.value.toUpperCase().trim() : "";
+              if (val !== "") filledCount++;
+              if (val === expected) correctCount++;
+            }
+          }
+        }
+
+        if (filledCount < totalCells) {
+          const emptyCount = totalCells - filledCount;
+          const confirmIncomplete = confirm(
+            `You have ${emptyCount} empty cell(s) remaining. Are you sure you want to submit your crossword now?`
+          );
+          if (!confirmIncomplete) return;
+        }
+
+        finishQuiz(correctCount, totalCells);
+      }
+
+      function finishQuiz(correctCount, totalCells) {
+        clearInterval(state.timerInterval);
+
+        const accuracyScore = Math.round((correctCount / totalCells) * 100);
+        const penalty = Math.min(state.hintsUsed * 5, 25);
+        state.score = Math.max(0, accuracyScore - penalty);
+
+        const mins = Math.floor(state.secondsElapsed / 60);
+        const secs = state.secondsElapsed % 60;
+        const timeFormatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        state.completedTime = timeFormatted;
+
+        let stars = "⭐";
+        if (state.score >= 90 && state.hintsUsed <= 2) {
+          stars = "⭐⭐⭐";
+        } else if (state.score >= 70) {
+          stars = "⭐⭐";
+        }
+
+        document.getElementById("res-score").textContent = `${state.score}%`;
+        document.getElementById("res-time").textContent = timeFormatted;
+        document.getElementById("res-hints").textContent = state.hintsUsed;
+        document.getElementById("res-stars").textContent = stars;
+
+        document.getElementById("cert-name").textContent = state.studentName;
+        document.getElementById("cert-class").textContent = state.studentClass;
+        
+        let levelLabel = "Medium (A1)";
+        if (state.difficulty === 'easy') levelLabel = "Easy (Pre-A1)";
+        if (state.difficulty === 'hard') levelLabel = "Hard (A2)";
+        document.getElementById("cert-level").textContent = levelLabel;
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
+        document.getElementById("cert-date").textContent = dateStr;
+
+        saveScoreToFirebase({
+          name: state.studentName,
+          class: state.studentClass,
+          level: state.difficulty,
+          score: state.score,
+          hintsUsed: state.hintsUsed,
+          timeTaken: timeFormatted,
+          timestamp: Date.now()
+        });
+
+        showScreen("screen-results");
+      }
+
+      // 8. FIREBASE SAVING & LOCAL FALLBACK
+      function saveScoreToFirebase(payload) {
+        const badge = document.getElementById("db-status-badge");
+        badge.innerHTML = "☁️ Saving record to Firebase Realtime Database...";
+        badge.style.color = "#fef08a";
+
+        try {
+          const localList = JSON.parse(localStorage.getItem("cefr_crossword_scores") || "[]");
+          localList.unshift(payload);
+          localStorage.setItem("cefr_crossword_scores", JSON.stringify(localList));
+        } catch (e) {
+          console.warn("Local storage write error:", e);
+        }
+
+        if (database) {
+          database.ref("/crossword_scores/").push(payload)
+            .then(() => {
+              badge.innerHTML = "✅ Successfully saved to School Assessment Records!";
+              badge.style.color = "#86efac";
+            })
+            .catch(err => {
+              console.warn("Firebase push notice:", err);
+              badge.innerHTML = "💾 Recorded in Local Assessment Records!";
+              badge.style.color = "#86efac";
+            });
+        } else {
+          badge.innerHTML = "💾 Recorded in Local Assessment Records!";
+          badge.style.color = "#86efac";
+        }
+      }
+
+      // 9. SCREEN NAVIGATION & TIMER
+      function showScreen(screenId) {
+        document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+        const target = document.getElementById(screenId);
+        if (target) target.classList.add("active");
+        window.scrollTo(0, 0);
+      }
+
+      function startQuiz() {
+        const nameInput = document.getElementById("input-name");
+        const classSelect = document.getElementById("select-class");
+        const levelSelect = document.getElementById("select-level");
+
+        if (!nameInput.value.trim()) {
+          alert("Please enter the student's full name.");
+          nameInput.focus();
+          return;
+        }
+
+        if (!classSelect.value) {
+          alert("Please select the student's class.");
+          classSelect.focus();
+          return;
+        }
+
+        state.studentName = nameInput.value.trim();
+        state.studentClass = classSelect.value;
+        state.difficulty = levelSelect.value;
+        state.hintsUsed = 0;
+        state.secondsElapsed = 0;
+
+        document.getElementById("quiz-student-display").textContent = state.studentName;
+        document.getElementById("quiz-class-display").textContent = state.studentClass;
+        
+        let levelBadgeText = "Medium (A1)";
+        if (state.difficulty === 'easy') levelBadgeText = "Easy (Pre-A1)";
+        if (state.difficulty === 'hard') levelBadgeText = "Hard (A2)";
+        document.getElementById("quiz-level-display").textContent = levelBadgeText;
+        document.getElementById("quiz-hints-count").textContent = "0 hints";
+
+        generateCrosswordPuzzle(state.difficulty);
+        renderCrosswordGrid();
+
+        clearInterval(state.timerInterval);
+        state.timerInterval = setInterval(() => {
+          state.secondsElapsed++;
+          const mins = Math.floor(state.secondsElapsed / 60);
+          const secs = state.secondsElapsed % 60;
+          document.getElementById("quiz-timer").textContent = 
+            `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }, 1000);
+
+        showScreen("screen-quiz");
+      }
+
+      function restartGame() {
+        clearInterval(state.timerInterval);
+        showScreen("screen-register");
+      }
+
+      // ==============================================
+      // 10. SAVE CERTIFICATE (PNG IMAGE) HANDLER
+      // ==============================================
+      function downloadCertificateImage() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1600;
+        canvas.height = 1100;
+        const ctx = canvas.getContext("2d");
+
+        // Cream Parchment Background
+        ctx.fillStyle = "#fffdf0";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Outer Dark Green Border #06400a
+        ctx.lineWidth = 26;
+        ctx.strokeStyle = "#06400a";
+        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+        // Inner Dashed Gold Border #c79700
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "#c79700";
+        ctx.setLineDash([18, 12]);
+        ctx.strokeRect(50, 50, canvas.width - 100, canvas.height - 100);
+        ctx.setLineDash([]);
+
+        // Thin Inner Guide Border
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#c79700";
+        ctx.strokeRect(65, 65, canvas.width - 130, canvas.height - 130);
+
+        // Header Text: Ministry
+        ctx.textAlign = "center";
+        ctx.font = "bold 26px 'Comic Sans MS', 'Comic Sans', cursive, sans-serif";
+        ctx.fillStyle = "#06400a";
+        ctx.fillText("MINISTRY OF EDUCATION • CEFR ENGLISH PROGRAMME", canvas.width / 2, 130);
+
+        // Certificate Title
+        ctx.font = "bold 58px 'Comic Sans MS', 'Comic Sans', cursive, sans-serif";
+        ctx.fillStyle = "#c79700";
+        ctx.fillText("CERTIFICATE OF ACHIEVEMENT", canvas.width / 2, 210);
+
+        // Subtitle
+        ctx.font = "italic 28px 'Comic Sans MS', 'Comic Sans', cursive, sans-serif";
+        ctx.fillStyle = "#06400a";
+        ctx.fillText("This official certificate is proudly presented to:", canvas.width / 2, 280);
+
+        // Student Name in Comic Sans #c79700
+        ctx.font = "bold 64px 'Comic Sans MS', 'Comic Sans', cursive, sans-serif";
+        ctx.fillStyle = "#c79700";
+        const studentDisplayName = state.studentName || "Star Student";
+        ctx.fillText(studentDisplayName, canvas.width / 2, 380);
+
+        // Underline under Student Name
+        ctx.strokeStyle = "#c79700";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        const textWidth = Math.min(ctx.measureText(studentDisplayName).width + 80, 700);
+        ctx.moveTo((canvas.width / 2) - (textWidth / 2), 405);
+        ctx.lineTo((canvas.width / 2) + (textWidth / 2), 405);
+        ctx.stroke();
+
+        // Certificate Description
+        ctx.font = "28px 'Comic Sans MS', 'Comic Sans', cursive, sans-serif";
+        ctx.fillStyle = "#06400a";
+        ctx.fillText(`from Class ${state.studentClass || "Year 1 Intelligent"}, for outstanding performance in the`, canvas.width / 2, 475);
+
+        let lvlName = "Medium (A1)";
+        if (state.difficulty === 'easy') lvlName = "Easy (Pre-A1)";
+        if (state.difficulty === 'hard') lvlName = "Hard (A2)";
+
+        ctx.font = "bold 34px 'Comic Sans MS', 'Comic Sans', cursive, sans-serif";
+        ctx.fillStyle = "#c79700";
+        ctx.fillText(`CEFR LexiCross English Quiz • ${lvlName}`, canvas.width / 2, 535);
+
+        ctx.font = "bold 28px 'Comic Sans MS', 'Comic Sans', cursive, sans-serif";
+        ctx.fillStyle = "#06400a";
+        ctx.fillText(`Final Score: ${state.score}% • Time: ${state.completedTime || '02:00'} • Hints Used: ${state.hintsUsed}`, canvas.width / 2, 595);
+
+        // Gold Ribbon Seal
+        const sealX = 280;
+        const sealY = 860;
+        ctx.save();
+        ctx.translate(sealX, sealY);
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 95, 0, Math.PI * 2);
+        ctx.fillStyle = "#c79700";
+        ctx.fill();
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "#06400a";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 80, 0, Math.PI * 2);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#fffdf0";
+        ctx.stroke();
+
+        ctx.fillStyle = "#fffdf0";
+        ctx.font = "bold 42px 'Comic Sans MS', 'Comic Sans', cursive";
+        ctx.fillText("★", 0, -18);
+        ctx.font = "bold 20px 'Comic Sans MS', 'Comic Sans', cursive";
+        ctx.fillText("CEFR", 0, 15);
+        ctx.fillText("EXCELLENCE", 0, 42);
+        ctx.restore();
+
+        // Date on Canvas
+        const dateStr = document.getElementById("cert-date").textContent || new Date().toLocaleDateString("en-GB");
+        ctx.font = "bold 28px 'Comic Sans MS', 'Comic Sans', cursive";
+        ctx.fillStyle = "#06400a";
+        ctx.fillText(dateStr, canvas.width / 2, 850);
+        ctx.font = "bold 20px 'Comic Sans MS', 'Comic Sans', cursive";
+        ctx.fillStyle = "#c79700";
+        ctx.fillText("Date of Issue", canvas.width / 2, 885);
+
+        // Teacher Anne Signature
+        ctx.font = "italic bold 36px 'Comic Sans MS', 'Comic Sans', cursive";
+        ctx.fillStyle = "#06400a";
+        ctx.fillText("Anne Teacher", canvas.width - 340, 825);
+        ctx.strokeStyle = "#06400a";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(canvas.width - 480, 845);
+        ctx.lineTo(canvas.width - 200, 845);
+        ctx.stroke();
+        ctx.font = "bold 22px 'Comic Sans MS', 'Comic Sans', cursive";
+        ctx.fillStyle = "#c79700";
+        ctx.fillText("Teacher Anne", canvas.width - 340, 875);
+        ctx.font = "18px 'Comic Sans MS', 'Comic Sans', cursive";
+        ctx.fillStyle = "#06400a";
+        ctx.fillText("CEFR English Coordinator", canvas.width - 340, 905);
+
+        // Generate and trigger download
+        try {
+          const imageURL = canvas.toDataURL("image/png");
+          const dlLink = document.createElement("a");
+          const safeName = (state.studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
+          dlLink.download = `CEFR_LexiCross_Certificate_${safeName}.png`;
+          dlLink.href = imageURL;
+          document.body.appendChild(dlLink);
+          dlLink.click();
+          document.body.removeChild(dlLink);
+          alert("🎉 Certificate saved successfully! Check your Downloads folder for the PNG file.");
+        } catch (e) {
+          console.error("Canvas export error:", e);
+          alert("Error saving certificate image.");
+        }
+      }
+
+      // 11. TEACHER PORTAL & AUTHENTICATION
+      const TEACHER_PASS = "ANNE_TEACHER_2026";
+      let isTeacherAuthenticated = false;
+
+      document.getElementById("nav-teacher-btn").addEventListener("click", () => {
+        openTeacherAuth();
+      });
+
+      document.getElementById("link-teacher-login").addEventListener("click", () => {
+        openTeacherAuth();
+      });
+
+      function openTeacherPortalFromResults() {
+        openTeacherAuth();
+      }
+
+      function openTeacherAuth() {
+        if (isTeacherAuthenticated) {
+          showTeacherDashboard();
+        } else {
+          document.getElementById("input-teacher-pwd").value = "";
+          document.getElementById("teacher-pwd-err").style.display = "none";
+          document.getElementById("modal-teacher-login").classList.add("open");
+        }
+      }
+
+      function closeTeacherModal() {
+        document.getElementById("modal-teacher-login").classList.remove("open");
+      }
+
+      function verifyTeacherPassword() {
+        const pwdInput = document.getElementById("input-teacher-pwd");
+        const errDiv = document.getElementById("teacher-pwd-err");
+
+        if (pwdInput.value === TEACHER_PASS) {
+          isTeacherAuthenticated = true;
+          closeTeacherModal();
+          showTeacherDashboard();
+        } else {
+          errDiv.style.display = "block";
+          pwdInput.focus();
+        }
+      }
+
+      function showTeacherDashboard() {
+        showScreen("screen-dashboard");
+        loadFirebaseScores();
+      }
+
+      function exitTeacherDashboard() {
+        showScreen("screen-register");
+      }
+
+      // 12. TEACHER DASHBOARD DATA LOADING & FILTERS
+      function loadFirebaseScores() {
+        const tbody = document.getElementById("dash-table-body");
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2rem; color:var(--text-light-gold);">🔄 Fetching latest submission records...</td></tr>`;
+
+        if (database) {
+          database.ref("/crossword_scores/").once("value")
+            .then(snapshot => {
+              const data = snapshot.val();
+              const scores = [];
+              if (data) {
+                Object.keys(data).forEach(k => {
+                  scores.push(data[k]);
+                });
+              }
+
+              // Also combine with any local items
+              try {
+                const local = JSON.parse(localStorage.getItem("cefr_crossword_scores") || "[]");
+                local.forEach(loc => {
+                  if (!scores.some(s => s.timestamp === loc.timestamp && s.name === loc.name)) {
+                    scores.push(loc);
+                  }
+                });
+              } catch (e) {}
+
+              scores.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+              state.allScores = scores;
+              renderDashboardData(scores);
+            })
+            .catch(err => {
+              console.warn("Firebase fetch error, using local fallback:", err);
+              loadLocalScoresFallback();
+            });
+        } else {
+          loadLocalScoresFallback();
+        }
+      }
+
+      function loadLocalScoresFallback() {
+        try {
+          const local = JSON.parse(localStorage.getItem("cefr_crossword_scores") || "[]");
+          local.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          state.allScores = local;
+          renderDashboardData(local);
+        } catch (e) {
+          state.allScores = [];
+          renderDashboardData([]);
+        }
+      }
+
+      function applyDashboardFilters() {
+        const nameFilter = (document.getElementById("dash-filter-name").value || "").toLowerCase().trim();
+        const classFilter = document.getElementById("dash-filter-class").value;
+        const levelFilter = document.getElementById("dash-filter-level").value;
+
+        const filtered = state.allScores.filter(item => {
+          const matchName = !nameFilter || (item.name && item.name.toLowerCase().includes(nameFilter));
+          const matchClass = !classFilter || item.class === classFilter;
+          const matchLevel = !levelFilter || item.level === levelFilter;
+          return matchName && matchClass && matchLevel;
+        });
+
+        renderDashboardData(filtered);
+      }
+
+      function renderDashboardData(scoresList) {
+        const tbody = document.getElementById("dash-table-body");
+        tbody.innerHTML = "";
+
+        // Update statistics cards
+        document.getElementById("dash-total-submissions").textContent = scoresList.length;
+
+        if (scoresList.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2.5rem; color:var(--text-light-gold);">No quiz records found matching the filter criteria.</td></tr>`;
+          document.getElementById("dash-avg-score").textContent = "0%";
+          document.getElementById("dash-avg-hints").textContent = "0";
+          document.getElementById("dash-top-class").textContent = "-";
+          return;
+        }
+
+        let totalScore = 0;
+        let totalHints = 0;
+        const classCounts = {};
+
+        scoresList.forEach(item => {
+          totalScore += Number(item.score || 0);
+          totalHints += Number(item.hintsUsed || 0);
+          if (item.class) {
+            classCounts[item.class] = (classCounts[item.class] || 0) + 1;
+          }
+
+          const tr = document.createElement("tr");
+
+          const d = item.timestamp ? new Date(item.timestamp) : new Date();
+          const dateStr = d.toLocaleDateString("en-GB", { day: '2-digit', month: 'short' }) + " " + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+          let scoreBadgeClass = "score-high";
+          if (item.score < 50) scoreBadgeClass = "score-low";
+          else if (item.score < 80) scoreBadgeClass = "score-med";
+
+          let levelBadge = "Medium";
+          if (item.level === 'easy') levelBadge = "Easy";
+          if (item.level === 'hard') levelBadge = "Hard";
+
+          tr.innerHTML = `
+            <td style="white-space:nowrap; color:var(--text-light-gold); font-size:0.85rem;">${dateStr}</td>
+            <td style="font-weight:700; color:#ffffff;">${escapeHtml(item.name || 'Anonymous')}</td>
+            <td><span style="color:var(--text-gold); font-weight:700;">${escapeHtml(item.class || 'Unassigned')}</span></td>
+            <td><span class="badge-level">${levelBadge}</span></td>
+            <td><span class="badge-score ${scoreBadgeClass}">${item.score}%</span></td>
+            <td style="color:#ffffff;">${item.hintsUsed || 0}</td>
+            <td style="color:var(--text-light-gold); font-family:monospace;">${item.timeTaken || '-'}</td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+
+        // Calculate averages
+        const avgScore = Math.round(totalScore / scoresList.length);
+        const avgHints = (totalHints / scoresList.length).toFixed(1);
+        document.getElementById("dash-avg-score").textContent = `${avgScore}%`;
+        document.getElementById("dash-avg-hints").textContent = avgHints;
+
+        // Find most active class
+        let topClass = "-";
+        let maxCount = 0;
+        Object.keys(classCounts).forEach(cls => {
+          if (classCounts[cls] > maxCount) {
+            maxCount = classCounts[cls];
+            topClass = cls;
+          }
+        });
+        document.getElementById("dash-top-class").textContent = topClass;
+      }
+
+      // 13. EXPORT TO CSV GENERATOR
+      function exportToCSV() {
+        if (!state.allScores || state.allScores.length === 0) {
+          alert("No student score records available to export.");
+          return;
+        }
+
+        const headers = ["Timestamp", "Student Name", "Class Stream", "CEFR Level", "Score (%)", "Hints Used", "Time Taken"];
+        const rows = state.allScores.map(item => {
+          const d = item.timestamp ? new Date(item.timestamp).toISOString() : "";
+          return [
+            `"${d}"`,
+            `"${(item.name || '').replace(/"/g, '""')}"`,
+            `"${(item.class || '').replace(/"/g, '""')}"`,
+            `"${item.level || ''}"`,
+            item.score || 0,
+            item.hintsUsed || 0,
+            `"${item.timeTaken || ''}"`
+          ].join(",");
+        });
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `CEFR_LexiCross_Assessment_Report_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // 14. UTILITY HELPERS
+      function escapeHtml(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+    </script>
+  </body>
+</html>
